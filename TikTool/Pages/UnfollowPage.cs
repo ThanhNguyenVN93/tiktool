@@ -73,7 +73,7 @@ internal sealed class UnfollowPage : UserControl
 
         var title = new Label
         {
-            Text = "Bỏ Theo Dõi Kênh Chết",
+            Text = T("Bỏ Theo Dõi Kênh Chết", "Unfollow Dead Channels"),
             Font = new Font("Segoe UI", 12f, FontStyle.Bold),
             ForeColor = Color.White,
             AutoSize = true,
@@ -81,7 +81,8 @@ internal sealed class UnfollowPage : UserControl
         };
         var subtitle = new Label
         {
-            Text = "Dọn dẹp danh sách theo dõi TikTok — bỏ theo dõi tài khoản không hoạt động lâu ngày",
+            Text = T("Dọn dẹp danh sách theo dõi TikTok — bỏ theo dõi tài khoản không hoạt động lâu ngày",
+                     "Clean up your TikTok following list — unfollow accounts that have been inactive for a long time"),
             Font = new Font("Segoe UI", 8.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = true,
@@ -90,7 +91,7 @@ internal sealed class UnfollowPage : UserControl
 
         _headerBadge = new Label
         {
-            Text = "Cần cookie",
+            Text = T("Cần cookie", "Cookie needed"),
             Font = Theme.FontLabel,
             AutoSize = true,
             Padding = new Padding(8, 4, 8, 4),
@@ -164,7 +165,7 @@ internal sealed class UnfollowPage : UserControl
 
         var criteriaLabel = new Label
         {
-            Text = "Tiêu chí kênh chết",
+            Text = T("Tiêu chí kênh chết", "Dead channel criteria"),
             Font = Theme.FontLabel,
             ForeColor = ColorTranslator.FromHtml("#444444"),
             AutoSize = true,
@@ -180,11 +181,11 @@ internal sealed class UnfollowPage : UserControl
             FlatStyle = FlatStyle.Flat,
         };
         // Chỉ mục phải khớp thứ tự với CriteriaThresholdDays (null = chỉ tính 0 video).
-        _criteriaCombo.Items.Add("Chưa từng đăng (0 video)");
-        _criteriaCombo.Items.Add("Không đăng > 30 ngày");
-        _criteriaCombo.Items.Add("Không đăng > 90 ngày");
-        _criteriaCombo.Items.Add("Không đăng > 180 ngày (mặc định)");
-        _criteriaCombo.Items.Add("Không đăng > 365 ngày");
+        _criteriaCombo.Items.Add(T("Chưa từng đăng (0 video)", "Never posted (0 videos)"));
+        _criteriaCombo.Items.Add(T("Không đăng > 30 ngày", "No posts > 30 days"));
+        _criteriaCombo.Items.Add(T("Không đăng > 90 ngày", "No posts > 90 days"));
+        _criteriaCombo.Items.Add(T("Không đăng > 180 ngày (mặc định)", "No posts > 180 days (default)"));
+        _criteriaCombo.Items.Add(T("Không đăng > 365 ngày", "No posts > 365 days"));
         _criteriaCombo.SelectedIndex = 3;
         _criteriaCombo.SelectedIndexChanged += (_, _) =>
         {
@@ -195,7 +196,7 @@ internal sealed class UnfollowPage : UserControl
 
         var modeLabel = new Label
         {
-            Text = "Chế độ bỏ theo dõi",
+            Text = T("Chế độ bỏ theo dõi", "Unfollow mode"),
             Font = Theme.FontLabel,
             ForeColor = ColorTranslator.FromHtml("#444444"),
             AutoSize = true,
@@ -210,8 +211,8 @@ internal sealed class UnfollowPage : UserControl
             ForeColor = Theme.TextPrimary,
             FlatStyle = FlatStyle.Flat,
         };
-        _modeCombo.Items.Add("API trước, dự phòng trình duyệt");
-        _modeCombo.Items.Add("Chỉ qua trình duyệt (an toàn hơn, chậm hơn)");
+        _modeCombo.Items.Add(T("API trước, dự phòng trình duyệt", "API first, browser fallback"));
+        _modeCombo.Items.Add(T("Chỉ qua trình duyệt (an toàn hơn, chậm hơn)", "Browser only (safer, slower)"));
         _modeCombo.SelectedIndex = _settingsService.Current.PreferApiOverPlaywright ? 0 : 1;
 
         row.Controls.Add(criteriaLabel);
@@ -227,7 +228,7 @@ internal sealed class UnfollowPage : UserControl
 
         _sectionLabel = new Label
         {
-            Text = "Chưa tải danh sách theo dõi",
+            Text = T("Chưa tải danh sách theo dõi", "Following list not loaded"),
             Font = Theme.FontLabel,
             ForeColor = ColorTranslator.FromHtml("#444444"),
             AutoSize = true,
@@ -236,7 +237,7 @@ internal sealed class UnfollowPage : UserControl
 
         _btnReload = new Guna2Button
         {
-            Text = "🔄  Tải lại",
+            Text = T("🔄  Tải lại", "🔄  Reload"),
             Font = Theme.FontMedium,
             Size = new Size(100, 28),
             Location = new Point(ContentWidth - 100, 0),
@@ -249,7 +250,7 @@ internal sealed class UnfollowPage : UserControl
 
         _btnSelectDead = new Guna2Button
         {
-            Text = "☠  Chọn tất cả kênh chết",
+            Text = T("☠  Chọn tất cả kênh chết", "☠  Select all dead"),
             Font = Theme.FontMedium,
             Size = new Size(190, 28),
             Location = new Point(ContentWidth - 300, 0),
@@ -290,7 +291,7 @@ internal sealed class UnfollowPage : UserControl
 
         _actionInfo = new Label
         {
-            Text = "0 đã chọn",
+            Text = T("0 đã chọn", "0 selected"),
             Font = new Font("Segoe UI", 8.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = true,
@@ -299,7 +300,7 @@ internal sealed class UnfollowPage : UserControl
 
         _btnStart = new Guna2Button
         {
-            Text = "Bắt đầu bỏ theo dõi",
+            Text = T("Bắt đầu bỏ theo dõi", "Start unfollowing"),
             Font = Theme.FontMedium,
             Size = new Size(160, 32),
             Location = new Point(ContentWidth - 160, 12),
@@ -312,7 +313,7 @@ internal sealed class UnfollowPage : UserControl
 
         _btnClearSelection = new Guna2Button
         {
-            Text = "Bỏ chọn",
+            Text = T("Bỏ chọn", "Clear selection"),
             Font = Theme.FontMedium,
             Size = new Size(100, 32),
             Location = new Point(ContentWidth - 160 - 108, 12),
@@ -344,45 +345,50 @@ internal sealed class UnfollowPage : UserControl
         var cookie = await _cookieService.LoadCookieAsync();
         if (cookie is null || string.IsNullOrEmpty(cookie.Username))
         {
-            _log.Log("[Unfollow] Chưa có cookie đã xác thực — sang tab Cookie để đăng nhập trước.", LogLevel.Warn);
+            _log.Log(T("[Unfollow] Chưa có cookie đã xác thực — sang tab Cookie để đăng nhập trước.",
+                        "[Unfollow] No authenticated cookie — go to Cookie tab to sign in first."), LogLevel.Warn);
             return;
         }
 
         _isBusy = true;
         _btnReload.Enabled = false;
-        _btnStart.Text = "⏹  Dừng";
+        _btnStart.Text = T("⏹  Dừng", "⏹  Stop");
         _cts = new CancellationTokenSource();
         var reloadCt = _cts.Token;
-        _log.Log("[Playwright] Đang mở Chrome thật (sẽ hiện cửa sổ) và inject cookie...", LogLevel.Info);
+        _log.Log(T("[Playwright] Đang mở Chrome thật (sẽ hiện cửa sổ) và inject cookie...",
+                    "[Playwright] Opening real Chrome (a window will appear) and injecting cookie..."), LogLevel.Info);
 
         try
         {
             await EnsurePlaywrightAsync(cookie);
 
-            _log.Log("[Unfollow] Đang tải danh sách đang theo dõi (cuộn tự động)...", LogLevel.Info);
+            _log.Log(T("[Unfollow] Đang tải danh sách đang theo dõi (cuộn tự động)...",
+                        "[Unfollow] Loading following list (auto-scroll)..."), LogLevel.Info);
             var progress = new Progress<string>(m => _log.Log(m, LogLevel.Info));
             var selectors = SelectorsService.Load();
             var accounts = await _playwright.LoadFollowingListAsync(selectors, cookie.Username!, progress, reloadCt);
 
             _accounts.Clear();
             _accounts.AddRange(accounts);
-            _log.Log($"[Unfollow] Đã tải {accounts.Count} tài khoản. Đang kiểm tra ngày đăng gần nhất...", LogLevel.Ok);
+            _log.Log(T($"[Unfollow] Đã tải {accounts.Count} tài khoản. Đang kiểm tra ngày đăng gần nhất...",
+                        $"[Unfollow] Loaded {accounts.Count} accounts. Checking last post dates..."), LogLevel.Ok);
 
             await CheckDeadChannelsAsync(reloadCt);
             RecomputeDeadStatus();
 
             RebuildList();
-            _log.Log($"[Unfollow] Hoàn tất — {_accounts.Count(a => a.IsDead)} kênh chết / {_accounts.Count} tổng.", LogLevel.Ok);
+            _log.Log(T($"[Unfollow] Hoàn tất — {_accounts.Count(a => a.IsDead)} kênh chết / {_accounts.Count} tổng.",
+                        $"[Unfollow] Done — {_accounts.Count(a => a.IsDead)} dead / {_accounts.Count} total."), LogLevel.Ok);
         }
         catch (Exception ex)
         {
-            _log.Log($"[Unfollow] Lỗi khi tải danh sách: {ex.Message}", LogLevel.Error);
+            _log.Log(T($"[Unfollow] Lỗi khi tải danh sách: {ex.Message}", $"[Unfollow] Failed to load list: {ex.Message}"), LogLevel.Error);
         }
         finally
         {
             _isBusy = false;
             _btnReload.Enabled = true;
-            _btnStart.Text = "🚫  Bắt đầu Unfollow";
+            _btnStart.Text = T("🚫  Bắt đầu Unfollow", "🚫  Start Unfollow");
             _cts?.Dispose();
             _cts = null;
             UpdateHeaderBadge();
@@ -421,7 +427,7 @@ internal sealed class UnfollowPage : UserControl
 
             if ((i + 1) % 10 == 0)
             {
-                _log.Log($"[Unfollow] Đã kiểm tra {i + 1}/{_accounts.Count} tài khoản...", LogLevel.Info);
+                _log.Log(T($"[Unfollow] Đã kiểm tra {i + 1}/{_accounts.Count} tài khoản...", $"[Unfollow] Checked {i + 1}/{_accounts.Count} accounts..."), LogLevel.Info);
             }
 
             await Task.Delay(300);
@@ -473,7 +479,7 @@ internal sealed class UnfollowPage : UserControl
         }
 
         RebuildList();
-        _log.Log($"[Unfollow] Đã chọn {_accounts.Count(a => a.IsDead)} kênh chết.", LogLevel.Info);
+        _log.Log(T($"[Unfollow] Đã chọn {_accounts.Count(a => a.IsDead)} kênh chết.", $"[Unfollow] Selected {_accounts.Count(a => a.IsDead)} dead channels."), LogLevel.Info);
     }
 
     private void ClearSelection()
@@ -498,30 +504,32 @@ internal sealed class UnfollowPage : UserControl
         var selected = _accounts.Where(a => a.IsSelected && a.Status != UnfollowStatus.Done).Take(sessionLimit).ToList();
         if (selected.Count == 0)
         {
-            _log.Log("[Unfollow] Chưa chọn tài khoản nào để unfollow.", LogLevel.Warn);
+            _log.Log(T("[Unfollow] Chưa chọn tài khoản nào để unfollow.", "[Unfollow] No accounts selected to unfollow."), LogLevel.Warn);
             return;
         }
 
         var skippedBySessionLimit = _accounts.Count(a => a.IsSelected && a.Status != UnfollowStatus.Done) - selected.Count;
         if (skippedBySessionLimit > 0)
         {
-            _log.Log($"[Unfollow] Giới hạn {sessionLimit} tài khoản/phiên (Cài đặt) — {skippedBySessionLimit} tài khoản còn lại sẽ chờ lần chạy sau.", LogLevel.Warn);
+            _log.Log(T($"[Unfollow] Giới hạn {sessionLimit} tài khoản/phiên (Cài đặt) — {skippedBySessionLimit} tài khoản còn lại sẽ chờ lần chạy sau.",
+                        $"[Unfollow] Session limit {sessionLimit} accounts (Settings) — {skippedBySessionLimit} remaining will wait for next run."), LogLevel.Warn);
         }
 
         var cookie = await _cookieService.LoadCookieAsync();
         if (cookie is null)
         {
-            _log.Log("[Unfollow] Không tìm thấy cookie — sang tab Cookie trước.", LogLevel.Error);
+            _log.Log(T("[Unfollow] Không tìm thấy cookie — sang tab Cookie trước.", "[Unfollow] Cookie not found — go to Cookie tab first."), LogLevel.Error);
             return;
         }
 
         _isBusy = true;
-        _btnStart.Text = "⏹  Dừng";
+        _btnStart.Text = T("⏹  Dừng", "⏹  Stop");
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
         var apiFirst = _modeCombo.SelectedIndex == 0;
 
-        _log.Log($"[Unfollow] Bắt đầu unfollow {selected.Count} tài khoản ({(apiFirst ? "API trước" : "chỉ trình duyệt")})...", LogLevel.Info);
+        _log.Log(T($"[Unfollow] Bắt đầu unfollow {selected.Count} tài khoản ({(apiFirst ? "API trước" : "chỉ trình duyệt")})...",
+                    $"[Unfollow] Starting unfollow for {selected.Count} accounts ({(apiFirst ? "API first" : "browser only")})..."), LogLevel.Info);
 
         try
         {
@@ -552,7 +560,8 @@ internal sealed class UnfollowPage : UserControl
                             if (_settingsService.Current.NotifyOnRateLimit)
                             {
                                 var choice = MessageBox.Show(
-                                    $"{rex.Message}\n\nTiếp tục unfollow các tài khoản còn lại?",
+                                    T($"{rex.Message}\n\nTiếp tục unfollow các tài khoản còn lại?",
+                                      $"{rex.Message}\n\nContinue unfollowing the remaining accounts?"),
                                     "TikTool — Rate limit",
                                     MessageBoxButtons.YesNo,
                                     MessageBoxIcon.Warning);
@@ -563,7 +572,8 @@ internal sealed class UnfollowPage : UserControl
                             }
                             else
                             {
-                                _log.Log("[Unfollow] Cảnh báo rate limit đang tắt (Cài đặt) — tự động dùng trình duyệt và tiếp tục.", LogLevel.Warn);
+                                _log.Log(T("[Unfollow] Cảnh báo rate limit đang tắt (Cài đặt) — tự động dùng trình duyệt và tiếp tục.",
+                                        "[Unfollow] Rate limit notification is off (Settings) — auto-switching to browser and continuing."), LogLevel.Warn);
                             }
 
                             await Task.Delay(10_000, ct);
@@ -583,12 +593,12 @@ internal sealed class UnfollowPage : UserControl
                     }
 
                     account.Status = UnfollowStatus.Done;
-                    _log.Log($"[Unfollow] ✓ Đã unfollow @{account.Username}", LogLevel.Ok);
+                    _log.Log(T($"[Unfollow] ✓ Đã unfollow @{account.Username}", $"[Unfollow] ✓ Unfollowed @{account.Username}"), LogLevel.Ok);
                     await _historyService.AddAsync(new HistoryItem
                     {
                         Type = "Unfollow",
                         Title = $"@{account.Username}",
-                        Detail = account.VideoCount == 0 ? "Kênh chết (0 video)" : $"{account.VideoCount} video",
+                        Detail = account.VideoCount == 0 ? T("Kênh chết (0 video)", "Dead channel (0 videos)") : $"{account.VideoCount} video",
                         Success = true,
                     });
                 }
@@ -602,7 +612,7 @@ internal sealed class UnfollowPage : UserControl
                 {
                     account.Status = UnfollowStatus.Failed;
                     account.ErrorMessage = ex.Message;
-                    _log.Log($"[Unfollow] ✗ Lỗi @{account.Username}: {ex.Message}", LogLevel.Error);
+                    _log.Log(T($"[Unfollow] ✗ Lỗi @{account.Username}: {ex.Message}", $"[Unfollow] ✗ Error @{account.Username}: {ex.Message}"), LogLevel.Error);
                     await _historyService.AddAsync(new HistoryItem
                     {
                         Type = "Unfollow",
@@ -620,16 +630,16 @@ internal sealed class UnfollowPage : UserControl
                 await Task.Delay(delay, ct);
             }
 
-            _log.Log("[Unfollow] Hoàn tất hàng đợi unfollow.", LogLevel.Ok);
+            _log.Log(T("[Unfollow] Hoàn tất hàng đợi unfollow.", "[Unfollow] Unfollow queue complete."), LogLevel.Ok);
         }
         catch (OperationCanceledException)
         {
-            _log.Log("[Unfollow] Đã dừng theo yêu cầu.", LogLevel.Warn);
+            _log.Log(T("[Unfollow] Đã dừng theo yêu cầu.", "[Unfollow] Stopped by user."), LogLevel.Warn);
         }
         finally
         {
             _isBusy = false;
-            _btnStart.Text = "🚫  Bắt đầu Unfollow";
+            _btnStart.Text = T("🚫  Bắt đầu Unfollow", "🚫  Start Unfollow");
             _cts?.Dispose();
             _cts = null;
         }
@@ -658,7 +668,7 @@ internal sealed class UnfollowPage : UserControl
     private void UpdateSectionLabel()
     {
         var dead = _accounts.Count(a => a.IsDead);
-        _sectionLabel.Text = $"{_accounts.Count} kênh đang theo dõi · {dead} kênh chết";
+        _sectionLabel.Text = T($"{_accounts.Count} kênh đang theo dõi · {dead} kênh chết", $"{_accounts.Count} following · {dead} dead");
     }
 
     private void UpdateActionInfo()
@@ -666,7 +676,7 @@ internal sealed class UnfollowPage : UserControl
         void Update()
         {
             var selected = _accounts.Count(a => a.IsSelected);
-            _actionInfo.Text = $"{selected} đã chọn";
+            _actionInfo.Text = T($"{selected} đã chọn", $"{selected} selected");
         }
 
         if (InvokeRequired)
@@ -682,7 +692,7 @@ internal sealed class UnfollowPage : UserControl
     private void UpdateHeaderBadge()
     {
         var dead = _accounts.Count(a => a.IsDead);
-        _headerBadge.Text = _accounts.Count == 0 ? "Cần cookie" : $"{dead} kênh chết / {_accounts.Count}";
+        _headerBadge.Text = _accounts.Count == 0 ? T("Cần cookie", "Cookie needed") : T($"{dead} kênh chết / {_accounts.Count}", $"{dead} dead / {_accounts.Count}");
         _headerBadge.ForeColor = dead > 0 ? Theme.Orange : Theme.TextMuted;
     }
 }

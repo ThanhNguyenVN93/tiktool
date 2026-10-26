@@ -48,7 +48,8 @@ internal sealed class DownloadPage : UserControl
             if (!_ytDlp.FfmpegAvailable)
             {
                 _log.Log(
-                    "[yt-dlp] Không tìm thấy ffmpeg — chỉ tải được định dạng gốc đã ghép sẵn (không thể ghép video+audio tách riêng, không chuyển đổi MP3 chuẩn). Cài ffmpeg và thêm vào PATH để dùng đầy đủ tính năng.",
+                    T("[yt-dlp] Không tìm thấy ffmpeg — chỉ tải được định dạng gốc đã ghép sẵn (không thể ghép video+audio tách riêng, không chuyển đổi MP3 chuẩn). Cài ffmpeg và thêm vào PATH để dùng đầy đủ tính năng.",
+                      "[yt-dlp] ffmpeg not found — only pre-merged formats can be downloaded (cannot merge video+audio or convert to standard MP3). Install ffmpeg and add it to PATH for full features."),
                     LogLevel.Warn);
             }
         }));
@@ -82,7 +83,8 @@ internal sealed class DownloadPage : UserControl
         };
         var subtitle = new Label
         {
-            Text = "Hỗ trợ TikTok, Instagram, Facebook Reels, YouTube và 1000+ trang khác",
+            Text = T("Hỗ trợ TikTok, Instagram, Facebook Reels, YouTube và 1000+ trang khác",
+                     "Supports TikTok, Instagram, Facebook Reels, YouTube and 1000+ other sites"),
             Font = new Font("Segoe UI", 8.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = true,
@@ -173,12 +175,13 @@ internal sealed class DownloadPage : UserControl
             ForeColor = Theme.TextPrimary,
             BorderStyle = BorderStyle.FixedSingle,
             Font = Theme.FontRegular,
-            PlaceholderText = "TikTok, Instagram, Facebook Reels, YouTube... — dán URL vào đây",
+            PlaceholderText = T("TikTok, Instagram, Facebook Reels, YouTube... — dán URL vào đây",
+                "TikTok, Instagram, Facebook Reels, YouTube... — paste URL here"),
         };
 
         var btnAnalyze = new Guna2Button
         {
-            Text = "+ Thêm",
+            Text = T("+ Thêm", "+ Add"),
             Font = Theme.FontMedium,
             Location = new Point(ContentWidth - 108, 0),
             Size = new Size(108, 34),
@@ -200,7 +203,7 @@ internal sealed class DownloadPage : UserControl
 
         var label = new Label
         {
-            Text = "Định dạng xuất",
+            Text = T("Định dạng xuất", "Output format"),
             Font = Theme.FontLabel,
             ForeColor = ColorTranslator.FromHtml("#444444"),
             AutoSize = true,
@@ -216,9 +219,9 @@ internal sealed class DownloadPage : UserControl
             BackColor = Color.Transparent,
         };
 
-        _formatRow.Controls.Add(BuildFormatCard("mp4", "🎬 MP4", "Video H264 · Tốt nhất"));
-        _formatRow.Controls.Add(BuildFormatCard("mp3", "🎵 MP3", "Chỉ âm thanh · 192kbps"));
-        _formatRow.Controls.Add(BuildFormatCard("mkv", "📦 MKV", "Chất lượng gốc"));
+        _formatRow.Controls.Add(BuildFormatCard("mp4", "🎬 MP4", T("Video H264 · Tốt nhất", "Video H264 · Best quality")));
+        _formatRow.Controls.Add(BuildFormatCard("mp3", "🎵 MP3", T("Chỉ âm thanh · 192kbps", "Audio only · 192kbps")));
+        _formatRow.Controls.Add(BuildFormatCard("mkv", "📦 MKV", T("Chất lượng gốc", "Original quality")));
 
         wrap.Controls.Add(label);
         wrap.Controls.Add(_formatRow);
@@ -282,7 +285,7 @@ internal sealed class DownloadPage : UserControl
 
         var btnChoose = new Guna2Button
         {
-            Text = "Chọn...",
+            Text = T("Chọn...", "Browse..."),
             Font = Theme.FontMedium,
             Location = new Point(ContentWidth - 108, 0),
             Size = new Size(108, 34),
@@ -311,7 +314,7 @@ internal sealed class DownloadPage : UserControl
 
         _queueCountLabel = new Label
         {
-            Text = "Hàng đợi download · 0 mục",
+            Text = T("Hàng đợi download · 0 mục", "Download queue · 0 items"),
             Font = Theme.FontLabel,
             ForeColor = ColorTranslator.FromHtml("#444444"),
             AutoSize = true,
@@ -347,7 +350,7 @@ internal sealed class DownloadPage : UserControl
 
         _actionInfo = new Label
         {
-            Text = "0 chờ · 0 đang tải · 0 xong",
+            Text = T("0 chờ · 0 đang tải · 0 xong", "0 waiting · 0 downloading · 0 done"),
             Font = new Font("Segoe UI", 8.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = true,
@@ -356,7 +359,7 @@ internal sealed class DownloadPage : UserControl
 
         _btnAdd = new Guna2Button
         {
-            Text = "+ Thêm URL",
+            Text = T("+ Thêm URL", "+ Add URL"),
             Font = Theme.FontMedium,
             Size = new Size(120, 32),
             Location = new Point(560, 12),
@@ -369,7 +372,7 @@ internal sealed class DownloadPage : UserControl
 
         _btnStopAll = new Guna2Button
         {
-            Text = "Dừng tất cả",
+            Text = T("Dừng tất cả", "Stop all"),
             Font = Theme.FontMedium,
             Size = new Size(110, 32),
             Location = new Point(440, 12),
@@ -392,13 +395,13 @@ internal sealed class DownloadPage : UserControl
         var url = _urlBox.Text.Trim();
         if (string.IsNullOrWhiteSpace(url))
         {
-            _log.Log("[yt-dlp] Chưa nhập URL", LogLevel.Warn);
+            _log.Log(T("[yt-dlp] Chưa nhập URL", "[yt-dlp] No URL entered"), LogLevel.Warn);
             return;
         }
 
         if (string.IsNullOrWhiteSpace(_outputDirBox.Text))
         {
-            _log.Log("[yt-dlp] Chưa chọn thư mục lưu", LogLevel.Warn);
+            _log.Log(T("[yt-dlp] Chưa chọn thư mục lưu", "[yt-dlp] No output folder selected"), LogLevel.Warn);
             return;
         }
 
@@ -419,7 +422,7 @@ internal sealed class DownloadPage : UserControl
         UpdateActionInfo();
 
         _urlBox.Clear();
-        _log.Log($"[Queue] Đã thêm vào hàng đợi: {url}", LogLevel.Info);
+        _log.Log(T($"[Queue] Đã thêm vào hàng đợi: {url}", $"[Queue] Added to queue: {url}"), LogLevel.Info);
 
         _ = ProcessQueueAsync();
     }
@@ -460,7 +463,7 @@ internal sealed class DownloadPage : UserControl
         {
             if (Interlocked.Decrement(ref _activeWorkers) == 0)
             {
-                _log.Log("[yt-dlp] Đã dừng theo yêu cầu", LogLevel.Warn);
+                _log.Log(T("[yt-dlp] Đã dừng theo yêu cầu", "[yt-dlp] Stopped by user"), LogLevel.Warn);
                 _cts?.Dispose();
                 _cts = null;
             }
@@ -479,7 +482,7 @@ internal sealed class DownloadPage : UserControl
         // Status đã được set = Downloading bởi worker trong ProcessQueueAsync
         RefreshRow(item);
         UpdateActionInfo();
-        _log.Log($"[yt-dlp] Đang tải: {item.Url}", LogLevel.Info);
+        _log.Log(T($"[yt-dlp] Đang tải: {item.Url}", $"[yt-dlp] Downloading: {item.Url}"), LogLevel.Info);
 
         var savedCookie = await _cookieService.LoadCookieAsync();
         // Chỉ gửi TikTok session cookie cho TikTok — các nguồn khác (Instagram, Facebook, YouTube)
@@ -528,7 +531,7 @@ internal sealed class DownloadPage : UserControl
         {
             item.Status = DownloadStatus.Error;
             item.ErrorMessage = ex.Message;
-            _log.Log($"[Lỗi] {item.Title}: {ex.Message}", LogLevel.Error);
+            _log.Log(T($"[Lỗi] {item.Title}: {ex.Message}", $"[Error] {item.Title}: {ex.Message}"), LogLevel.Error);
             await _historyService.AddAsync(new HistoryItem
             {
                 Type = "Download",
@@ -564,7 +567,7 @@ internal sealed class DownloadPage : UserControl
 
     private void UpdateQueueCount()
     {
-        _queueCountLabel.Text = $"Hàng đợi download · {_queue.Count} mục";
+        _queueCountLabel.Text = T($"Hàng đợi download · {_queue.Count} mục", $"Download queue · {_queue.Count} items");
     }
 
     private void UpdateActionInfo()
@@ -574,7 +577,7 @@ internal sealed class DownloadPage : UserControl
             var waiting = _queue.Count(i => i.Status == DownloadStatus.Waiting);
             var downloading = _queue.Count(i => i.Status == DownloadStatus.Downloading);
             var done = _queue.Count(i => i.Status == DownloadStatus.Done);
-            _actionInfo.Text = $"{waiting} chờ · {downloading} đang tải · {done} xong";
+            _actionInfo.Text = T($"{waiting} chờ · {downloading} đang tải · {done} xong", $"{waiting} waiting · {downloading} downloading · {done} done");
         }
 
         if (InvokeRequired)
@@ -591,12 +594,12 @@ internal sealed class DownloadPage : UserControl
     {
         _cts?.Cancel();
         if (_activeWorkers > 0)
-            _log.Log("[yt-dlp] Đang dừng download hiện tại...", LogLevel.Warn);
+            _log.Log(T("[yt-dlp] Đang dừng download hiện tại...", "[yt-dlp] Stopping current download..."), LogLevel.Warn);
 
         foreach (var item in _queue.Where(i => i.Status == DownloadStatus.Waiting))
         {
             item.Status = DownloadStatus.Error;
-            item.ErrorMessage = "Đã huỷ";
+            item.ErrorMessage = T("Đã huỷ", "Cancelled");
             RefreshRow(item);
         }
 
