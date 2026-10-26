@@ -295,7 +295,7 @@ internal sealed class UnfollowPage : UserControl
             Font = new Font("Segoe UI", 8.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = true,
-            Location = new Point(20, 18),
+            Location = new Point(20, 21),
         };
 
         _btnStart = new Guna2Button
@@ -313,11 +313,11 @@ internal sealed class UnfollowPage : UserControl
 
         _btnClearSelection = new Guna2Button
         {
-            Text = T("Bỏ chọn", "Clear selection"),
+            Text = T("Bỏ chọn", "Clear"),
             Font = Theme.FontMedium,
-            Size = new Size(100, 32),
-            Location = new Point(ContentWidth - 160 - 108, 12),
-            FillColor = ColorTranslator.FromHtml("#1a1a1a"),
+            Size = new Size(110, 32),
+            Location = new Point(ContentWidth - 160 - 8 - 110, 12),
+            FillColor = ColorTranslator.FromHtml("#2a2a2a"),
             ForeColor = Theme.TextSecondary,
             BorderRadius = 7,
             Cursor = Cursors.Hand,
