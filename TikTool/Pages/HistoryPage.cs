@@ -48,7 +48,7 @@ internal sealed class HistoryPage : UserControl
 
         header.Controls.Add(new Label
         {
-            Text = "Lịch sử",
+            Text = T("Lịch sử", "History"),
             Font = new Font("Segoe UI", 12f, FontStyle.Bold),
             ForeColor = Color.White,
             AutoSize = true,
@@ -56,7 +56,8 @@ internal sealed class HistoryPage : UserControl
         });
         header.Controls.Add(new Label
         {
-            Text = "Toàn bộ lượt tải video và bỏ theo dõi đã thực hiện (tối đa 500 mục gần nhất)",
+            Text = T("Toàn bộ lượt tải video và bỏ theo dõi đã thực hiện (tối đa 500 mục gần nhất)",
+                     "All downloads and unfollows (up to 500 most recent)"),
             Font = new Font("Segoe UI", 8.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = true,
@@ -102,9 +103,9 @@ internal sealed class HistoryPage : UserControl
         var row = new Panel { Width = ContentWidth, Height = 76, Margin = new Padding(0, 0, 0, 16) };
         var cardWidth = (ContentWidth - 16) / 3;
 
-        var (card1, label1) = BuildStatCard("🎬", "Video đã tải", cardWidth, 0);
-        var (card2, label2) = BuildStatCard("🚫", "Đã bỏ theo dõi", cardWidth, cardWidth + 8);
-        var (card3, label3) = BuildStatCard("💾", "Tổng dung lượng", cardWidth, (cardWidth + 8) * 2);
+        var (card1, label1) = BuildStatCard("🎬", T("Video đã tải","Videos downloaded"), cardWidth, 0);
+        var (card2, label2) = BuildStatCard("🚫", T("Đã bỏ theo dõi","Unfollowed"), cardWidth, cardWidth + 8);
+        var (card3, label3) = BuildStatCard("💾", T("Tổng dung lượng","Total size"), cardWidth, (cardWidth + 8) * 2);
 
         _statDownloads = label1;
         _statUnfollows = label2;
@@ -148,10 +149,10 @@ internal sealed class HistoryPage : UserControl
             Margin = new Padding(0, 0, 0, 12),
         };
 
-        row.Controls.Add(BuildFilterChip("all", "Tất cả"));
-        row.Controls.Add(BuildFilterChip("today", "Hôm nay"));
-        row.Controls.Add(BuildFilterChip("week", "Tuần này"));
-        row.Controls.Add(BuildFilterChip("month", "Tháng này"));
+        row.Controls.Add(BuildFilterChip("all", T("Tất cả","All")));
+        row.Controls.Add(BuildFilterChip("today", T("Hôm nay","Today")));
+        row.Controls.Add(BuildFilterChip("week", T("Tuần này","This week")));
+        row.Controls.Add(BuildFilterChip("month", T("Tháng này","This month")));
         return row;
     }
 
@@ -200,7 +201,7 @@ internal sealed class HistoryPage : UserControl
 
         _emptyLabel = new Label
         {
-            Text = "Chưa có lịch sử nào.",
+            Text = T("Chưa có lịch sử nào.", "No history yet."),
             Font = Theme.FontRegular,
             ForeColor = Theme.TextMuted,
             AutoSize = true,
@@ -224,7 +225,7 @@ internal sealed class HistoryPage : UserControl
 
         var btnExport = new Guna2Button
         {
-            Text = "⬇  Xuất CSV",
+            Text = T("Xuất CSV","Export CSV"),
             Font = Theme.FontMedium,
             Size = new Size(110, 32),
             Location = new Point(560, 12),
@@ -237,7 +238,7 @@ internal sealed class HistoryPage : UserControl
 
         var btnClear = new Guna2Button
         {
-            Text = "Xóa lịch sử",
+            Text = T("Xóa lịch sử","Clear history"),
             Font = Theme.FontMedium,
             Size = new Size(110, 32),
             Location = new Point(450, 12),
@@ -366,7 +367,8 @@ internal sealed class HistoryPage : UserControl
     private async Task ClearHistoryAsync()
     {
         var confirm = MessageBox.Show(
-            "Xóa toàn bộ lịch sử? Hành động này không thể hoàn tác.",
+            T("Xóa toàn bộ lịch sử? Hành động này không thể hoàn tác.",
+              "Clear all history? This action cannot be undone."),
             "TikTool",
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Warning);

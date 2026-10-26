@@ -70,6 +70,7 @@ public sealed class MainForm : Form
         RegisterPage("cookie", cookiePage);
         RegisterPage("settings", new SettingsPage(settingsService));
         RegisterPage("history", new HistoryPage(historyService));
+        RegisterPage("guide", new GuidePage());
 
         NavigateTo("download");
 
@@ -156,16 +157,17 @@ public sealed class MainForm : Form
         };
 
         flow.Controls.Add(BuildLogo());
-        flow.Controls.Add(BuildSectionLabel("CHỨC NĂNG"));
+        flow.Controls.Add(BuildSectionLabel(T("CHỨC NĂNG", "FEATURES")));
         flow.Controls.Add(CreateNavItem("download", "📥", "Download"));
-        flow.Controls.Add(CreateNavItem("unfollow", "🚫", "Bỏ theo dõi"));
-        flow.Controls.Add(BuildSectionLabel("HỆ THỐNG"));
+        flow.Controls.Add(CreateNavItem("unfollow", "🚫", T("Bỏ theo dõi", "Unfollow")));
+        flow.Controls.Add(BuildSectionLabel(T("HỆ THỐNG", "SYSTEM")));
         flow.Controls.Add(CreateNavItem("cookie", "🍪", "Cookie"));
-        flow.Controls.Add(CreateNavItem("settings", "🔧", "Cài đặt"));
-        flow.Controls.Add(CreateNavItem("history", "📋", "Lịch sử"));
-        flow.Controls.Add(BuildSectionLabel("CỘNG ĐỒNG"));
-        flow.Controls.Add(CreateLinkItem("🐛", "Báo lỗi", () => OpenUrl("https://github.com/ThanhNguyenVN93/tiktool/issues")));
-        flow.Controls.Add(CreateLinkItem("❤️", "Đóng góp", ShowDonation));
+        flow.Controls.Add(CreateNavItem("settings", "🔧", T("Cài đặt", "Settings")));
+        flow.Controls.Add(CreateNavItem("history", "📋", T("Lịch sử", "History")));
+        flow.Controls.Add(CreateNavItem("guide", "📖", T("Hướng dẫn", "Guide")));
+        flow.Controls.Add(BuildSectionLabel(T("CỘNG ĐỒNG", "COMMUNITY")));
+        flow.Controls.Add(CreateLinkItem("🐛", T("Báo lỗi", "Report bug"), () => OpenUrl("https://github.com/ThanhNguyenVN93/tiktool/issues")));
+        flow.Controls.Add(CreateLinkItem("❤️", T("Đóng góp", "Donate"), ShowDonation));
 
         sidebar.Controls.Add(flow);
         sidebar.Controls.Add(BuildFooter());
@@ -350,7 +352,7 @@ public sealed class MainForm : Form
                 if (!string.IsNullOrEmpty(ver))
                     SetFooterRow(_lblYtDlp, _dotYtDlp, $"yt-dlp {ver}", Theme.Green);
                 else
-                    SetFooterRow(_lblYtDlp, _dotYtDlp, "yt-dlp (không rõ ver)", Theme.Orange);
+                    SetFooterRow(_lblYtDlp, _dotYtDlp, T("yt-dlp (không rõ ver)", "yt-dlp (unknown ver)"), Theme.Orange);
             }
         }
         catch
@@ -368,7 +370,7 @@ public sealed class MainForm : Form
         };
         var chromeFound = chromePaths.Any(File.Exists);
         SetFooterRow(_lblChrome, _dotChrome,
-            chromeFound ? "Chrome đã cài" : "Chrome chưa tìm thấy",
+            chromeFound ? T("Chrome đã cài", "Chrome found") : T("Chrome chưa tìm thấy", "Chrome not found"),
             chromeFound ? Theme.Blue : Theme.Orange);
 
         // Cookie
@@ -384,7 +386,7 @@ public sealed class MainForm : Form
             }
             else
             {
-                SetFooterRow(_lblCookie, _dotCookie, "Cookie chưa xác thực", Theme.TextMuted);
+                SetFooterRow(_lblCookie, _dotCookie, T("Cookie chưa xác thực", "Cookie not set"), Theme.TextMuted);
             }
         }
         catch

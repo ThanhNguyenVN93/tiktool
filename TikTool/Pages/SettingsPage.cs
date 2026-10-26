@@ -61,7 +61,7 @@ internal sealed class SettingsPage : UserControl
 
         header.Controls.Add(new Label
         {
-            Text = "Cài đặt",
+            Text = T("Cài đặt", "Settings"),
             Font = new Font("Segoe UI", 12f, FontStyle.Bold),
             ForeColor = Color.White,
             AutoSize = true,
@@ -69,7 +69,8 @@ internal sealed class SettingsPage : UserControl
         });
         header.Controls.Add(new Label
         {
-            Text = "Tuỳ chỉnh hành vi tải video, bỏ theo dõi và khởi động ứng dụng",
+            Text = T("Tuỳ chỉnh hành vi tải video, bỏ theo dõi và khởi động ứng dụng",
+                     "Customize download, unfollow and startup behavior"),
             Font = new Font("Segoe UI", 8.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = true,
@@ -102,10 +103,10 @@ internal sealed class SettingsPage : UserControl
             Location = new Point(20, 16),
         };
 
-        flow.Controls.Add(BuildGroup("TẢI VIDEO", BuildDownloadRows()));
-        flow.Controls.Add(BuildGroup("BỎ THEO DÕI", BuildUnfollowRows()));
-        flow.Controls.Add(BuildGroup("GIAO DIỆN & HỆ THỐNG", BuildAppRows()));
-        flow.Controls.Add(BuildGroup("NGÔN NGỮ", BuildLanguageRows()));
+        flow.Controls.Add(BuildGroup(T("TẢI VIDEO", "DOWNLOAD"), BuildDownloadRows()));
+        flow.Controls.Add(BuildGroup(T("BỎ THEO DÕI", "UNFOLLOW"), BuildUnfollowRows()));
+        flow.Controls.Add(BuildGroup(T("GIAO DIỆN & HỆ THỐNG", "INTERFACE & SYSTEM"), BuildAppRows()));
+        flow.Controls.Add(BuildGroup(T("NGÔN NGỮ", "LANGUAGE"), BuildLanguageRows()));
 
         scroll.Controls.Add(flow);
         return scroll;
@@ -206,11 +207,11 @@ internal sealed class SettingsPage : UserControl
 
         return new List<Control>
         {
-            BuildRow("📁", "Thư mục lưu mặc định", "Nơi lưu video khi tải xong", outputDirControl),
-            BuildRow("🎬", "Định dạng mặc định", "Format được chọn sẵn khi thêm URL mới", _formatCombo),
-            BuildRow("⚡", "Số lượt tải song song", "Số video tải cùng lúc (2–3 là tối ưu trên mạng chậm/4G)", _concurrentNumeric),
-            BuildRow("🔄", "Tự động cập nhật yt-dlp", "Kiểm tra bản mới mỗi khi mở app", _autoUpdateToggle),
-            BuildRow("🍪", "Trình duyệt lấy cookie", "yt-dlp đọc cookie từ trình duyệt để tải Instagram/Facebook", _cookieBrowserCombo),
+            BuildRow("📁", T("Thư mục lưu mặc định","Default output folder"), T("Nơi lưu video khi tải xong","Where downloaded videos are saved"), outputDirControl),
+            BuildRow("🎬", T("Định dạng mặc định","Default format"), T("Format được chọn sẵn khi thêm URL mới","Pre-selected format when adding a new URL"), _formatCombo),
+            BuildRow("⚡", T("Số lượt tải song song","Concurrent downloads"), T("Số video tải cùng lúc (2–3 là tối ưu trên mạng chậm/4G)","Videos downloading at once (2–3 optimal on slow/4G)"), _concurrentNumeric),
+            BuildRow("🔄", T("Tự động cập nhật yt-dlp","Auto-update yt-dlp"), T("Kiểm tra bản mới mỗi khi mở app","Check for new version on startup"), _autoUpdateToggle),
+            BuildRow("🍪", T("Trình duyệt lấy cookie","Cookie browser"), T("yt-dlp đọc cookie từ trình duyệt để tải Instagram/Facebook","yt-dlp reads cookies from browser for Instagram/Facebook"), _cookieBrowserCombo),
         };
     }
 
@@ -231,11 +232,11 @@ internal sealed class SettingsPage : UserControl
 
         return new List<Control>
         {
-            BuildRow("⏱", "Delay giữa mỗi lượt bỏ theo dõi", "Chờ ngẫu nhiên trong khoảng này để tránh bị TikTok khoá", delayControl),
-            BuildRow("🔢", "Giới hạn mỗi phiên", "Số tài khoản tối đa bỏ theo dõi trong 1 lần bấm Bắt đầu", _sessionLimitNumeric),
-            BuildRow("🌐", "Ưu tiên API trước Playwright", "Nhanh hơn; tự fallback sang trình duyệt khi API lỗi", _preferApiToggle),
-            BuildRow("🤝", "Bỏ qua bạn bè (follow qua lại)", "Không unfollow tài khoản đang follow lại mình", _skipFriendsToggle),
-            BuildRow("🔔", "Cảnh báo khi bị rate limit", "Hiện hộp thoại hỏi tiếp tục hay dừng khi TikTok chặn", _notifyRateLimitToggle),
+            BuildRow("⏱", T("Delay giữa mỗi lượt bỏ theo dõi","Delay between unfollows"), T("Chờ ngẫu nhiên trong khoảng này để tránh bị TikTok khoá","Random wait to avoid TikTok rate-limiting"), delayControl),
+            BuildRow("🔢", T("Giới hạn mỗi phiên","Session limit"), T("Số tài khoản tối đa bỏ theo dõi trong 1 lần bấm Bắt đầu","Max accounts to unfollow per Start click"), _sessionLimitNumeric),
+            BuildRow("🌐", T("Ưu tiên API trước Playwright","Prefer API over browser"), T("Nhanh hơn; tự fallback sang trình duyệt khi API lỗi","Faster; auto-falls back to browser on API error"), _preferApiToggle),
+            BuildRow("🤝", T("Bỏ qua bạn bè (follow qua lại)","Skip mutual follows"), T("Không unfollow tài khoản đang follow lại mình","Don't unfollow accounts who follow you back"), _skipFriendsToggle),
+            BuildRow("🔔", T("Cảnh báo khi bị rate limit","Notify on rate limit"), T("Hiện hộp thoại hỏi tiếp tục hay dừng khi TikTok chặn","Show dialog asking to continue or stop when TikTok blocks"), _notifyRateLimitToggle),
         };
     }
 
@@ -246,19 +247,19 @@ internal sealed class SettingsPage : UserControl
 
         return new List<Control>
         {
-            BuildRow("🖥", "Khởi động cùng Windows", "Tự mở TikTool khi đăng nhập máy", _startWithWindowsToggle),
-            BuildRow("🔽", "Thu nhỏ xuống khay hệ thống", "Đóng cửa sổ sẽ ẩn app xuống system tray thay vì thoát", _minimizeToTrayToggle),
+            BuildRow("🖥", T("Khởi động cùng Windows","Start with Windows"), T("Tự mở TikTool khi đăng nhập máy","Auto-launch TikTool on login"), _startWithWindowsToggle),
+            BuildRow("🔽", T("Thu nhỏ xuống khay hệ thống","Minimize to tray"), T("Đóng cửa sổ sẽ ẩn app xuống system tray thay vì thoát","Closing the window hides the app to the system tray"), _minimizeToTrayToggle),
         };
     }
 
     private List<Control> BuildLanguageRows()
     {
         _languageCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 140, FlatStyle = FlatStyle.Flat, BackColor = ColorTranslator.FromHtml("#161616"), ForeColor = Theme.TextPrimary };
-        _languageCombo.Items.AddRange(new object[] { "Tiếng Việt", "English" });
+        _languageCombo.Items.AddRange(new object[] { "Tiếng Việt (vi)", "English (en)" });
 
         return new List<Control>
         {
-            BuildRow("🌍", "Ngôn ngữ giao diện", "Ứng dụng sẽ tự khởi động lại khi thay đổi", _languageCombo),
+            BuildRow("🌍", T("Ngôn ngữ giao diện","Interface language"), T("Ứng dụng sẽ tự khởi động lại khi thay đổi","App will restart automatically on change"), _languageCombo),
         };
     }
 
@@ -332,7 +333,7 @@ internal sealed class SettingsPage : UserControl
 
         var btnSave = new Guna2Button
         {
-            Text = "Lưu cài đặt",
+            Text = T("Lưu cài đặt", "Save settings"),
             Font = Theme.FontMedium,
             Size = new Size(140, 32),
             Location = new Point(560, 12),
@@ -412,7 +413,7 @@ internal sealed class SettingsPage : UserControl
 
         if (langChanged)
         {
-            _savedInfo.Text = "✓ Đã lưu — đang khởi động lại…";
+            _savedInfo.Text = T("✓ Đã lưu — đang khởi động lại…", "✓ Saved — restarting…");
             // Delay để user thấy message trước khi restart
             var timer = new System.Windows.Forms.Timer { Interval = 800 };
             timer.Tick += (_, _) => { timer.Stop(); Application.Restart(); };
@@ -420,7 +421,7 @@ internal sealed class SettingsPage : UserControl
         }
         else
         {
-            _savedInfo.Text = $"✓ Đã lưu lúc {DateTime.Now:HH:mm:ss}";
+            _savedInfo.Text = T($"✓ Đã lưu lúc {DateTime.Now:HH:mm:ss}", $"✓ Saved at {DateTime.Now:HH:mm:ss}");
         }
     }
 
