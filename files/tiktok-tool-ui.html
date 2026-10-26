@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>TikTool - Demo UI</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #080808; color: #e8e8e8;
+    height: 100vh; display: flex; flex-direction: column;
+    overflow: hidden; font-size: 13px;
+  }
+  .titlebar {
+    height: 36px; background: #0d0d0d;
+    border-bottom: 1px solid #1e1e1e;
+    display: flex; align-items: center;
+    padding: 0 14px; gap: 8px; flex-shrink: 0;
+  }
+  .titlebar-icon {
+    width: 16px; height: 16px;
+    background: linear-gradient(135deg, #ff2d55, #ff6b35);
+    border-radius: 4px; display: flex; align-items: center;
+    justify-content: center; font-size: 9px;
+  }
+  .titlebar-title { font-size: 12px; color: #888; font-weight: 500; }
+  .titlebar-controls { margin-left: auto; display: flex; gap: 6px; }
+  .titlebar-btn { width: 12px; height: 12px; border-radius: 50%; background: #333; cursor: pointer; }
+  .titlebar-btn.close { background: #ff5f57; }
+  .titlebar-btn.min { background: #febc2e; }
+  .titlebar-btn.max { background: #28c840; }
+  .app { display: flex; flex: 1; overflow: hidden; }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 180px; background: #0d0d0d;
+    border-right: 1px solid #1e1e1e;
+    display: flex; flex-direction: column;
+    padding: 12px 0; flex-shrink: 0;
+  }
+  .sidebar-logo { padding: 8px 16px 20px; display: flex; align-items: center; gap: 8px; }
+  .logo-mark {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, #ff2d55, #ff6b35);
+    border-radius: 8px; display: flex; align-items: center;
+    justify-content: center; font-size: 14px; flex-shrink: 0;
+  }
+  .logo-text { font-size: 13px; font-weight: 700; color: #fff; }
+  .logo-sub { font-size: 10px; color: #555; }
+  .sidebar-section { padding: 0 8px; margin-bottom: 4px; }
+  .sidebar-label {
+    font-size: 10px; color: #444; font-weight: 600;
+    letter-spacing: 0.8px; text-transform: uppercase;
+    padding: 8px 8px 4px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 10px; border-radius: 6px;
+    cursor: pointer; color: #666;
+    transition: all 0.15s; font-size: 13px; font-weight: 500;
+  }
+  .nav-item:hover { background: #161616; color: #ccc; }
+  .nav-item.active { background: rgba(255,45,85,0.12); color: #ff2d55; }
+  .nav-icon { font-size: 15px; width: 18px; text-align: center; }
+  .sidebar-footer { margin-top: auto; padding: 12px 8px; border-top: 1px solid #1a1a1a; }
+  .status-dot {
+    display: inline-block; width: 6px; height: 6px;
+    border-radius: 50%; background: #22c55e;
+    margin-right: 6px; box-shadow: 0 0 6px #22c55e88;
+  }
+  .status-text { font-size: 11px; color: #555; }
+
+  /* CONTENT */
+  .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #0f0f0f; }
+  .content-header {
+    padding: 16px 20px 12px; border-bottom: 1px solid #1a1a1a;
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+  }
+  .content-title { font-size: 15px; font-weight: 700; color: #fff; }
+  .content-sub { font-size: 11px; color: #555; margin-top: 2px; }
+  .header-badge {
+    background: rgba(255,45,85,0.15); color: #ff2d55;
+    font-size: 10px; font-weight: 600; padding: 3px 8px;
+    border-radius: 20px; border: 1px solid rgba(255,45,85,0.25);
+  }
+  .header-badge.green {
+    background: rgba(34,197,94,0.12); color: #22c55e;
+    border-color: rgba(34,197,94,0.25);
+  }
+  .header-badge.blue {
+    background: rgba(96,165,250,0.12); color: #60a5fa;
+    border-color: rgba(96,165,250,0.25);
+  }
+  .header-badge.orange {
+    background: rgba(251,146,60,0.12); color: #fb923c;
+    border-color: rgba(251,146,60,0.25);
+  }
+  .tab-bar { display: flex; border-bottom: 1px solid #1a1a1a; padding: 0 20px; flex-shrink: 0; }
+  .tab {
+    padding: 10px 16px; font-size: 12px; color: #555;
+    cursor: pointer; border-bottom: 2px solid transparent;
+    font-weight: 500; transition: all 0.15s;
+  }
+  .tab:hover { color: #aaa; }
+  .tab.active { color: #ff2d55; border-bottom-color: #ff2d55; }
+  .scroll-area { flex: 1; overflow-y: auto; padding: 16px 20px; }
+  .scroll-area::-webkit-scrollbar { width: 4px; }
+  .scroll-area::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+
+  /* INPUTS */
+  .row { display: flex; gap: 8px; margin-bottom: 14px; }
+  .input-wrap { flex: 1; position: relative; }
+  .input-icon {
+    position: absolute; left: 10px; top: 50%;
+    transform: translateY(-50%); font-size: 13px; color: #444;
+  }
+  input[type=text], select, textarea {
+    width: 100%; background: #161616; border: 1px solid #252525;
+    border-radius: 7px; color: #ddd; font-size: 12px;
+    padding: 9px 10px 9px 32px; outline: none; font-family: inherit;
+    transition: border-color 0.15s;
+  }
+  input[type=text]:focus, textarea:focus { border-color: #ff2d55; }
+  select { padding-left: 10px; cursor: pointer; }
+  textarea { padding-left: 10px; resize: vertical; line-height: 1.6; }
+
+  .btn {
+    padding: 9px 16px; border-radius: 7px; border: none;
+    font-size: 12px; font-weight: 600; cursor: pointer;
+    font-family: inherit; transition: all 0.15s; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .btn-primary { background: #ff2d55; color: #fff; }
+  .btn-primary:hover { background: #ff4466; }
+  .btn-ghost { background: #1a1a1a; color: #888; border: 1px solid #252525; }
+  .btn-ghost:hover { background: #222; color: #ccc; }
+  .btn-success { background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
+  .btn-success:hover { background: rgba(34,197,94,0.22); }
+  .btn-blue { background: rgba(96,165,250,0.15); color: #60a5fa; border: 1px solid rgba(96,165,250,0.3); }
+  .btn-blue:hover { background: rgba(96,165,250,0.22); }
+  .btn-sm { padding: 5px 10px; font-size: 11px; }
+
+  /* FORMAT CARDS */
+  .format-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .format-card {
+    background: #141414; border: 1px solid #222;
+    border-radius: 8px; padding: 10px 12px; cursor: pointer; transition: all 0.15s;
+  }
+  .format-card:hover { border-color: #333; }
+  .format-card.selected { border-color: #ff2d55; background: rgba(255,45,85,0.06); }
+  .format-name { font-size: 12px; font-weight: 700; color: #fff; margin-bottom: 2px; }
+  .format-desc { font-size: 10px; color: #555; }
+
+  .section-label {
+    font-size: 11px; color: #444; font-weight: 600;
+    letter-spacing: 0.5px; margin-bottom: 8px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  /* QUEUE */
+  .queue-item {
+    display: flex; align-items: center; gap: 10px;
+    background: #141414; border: 1px solid #1e1e1e;
+    border-radius: 8px; padding: 10px 12px; margin-bottom: 6px;
+  }
+  .queue-thumb {
+    width: 36px; height: 36px; border-radius: 6px;
+    background: linear-gradient(135deg, #1a1a2e, #16213e);
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 16px;
+  }
+  .queue-info { flex: 1; min-width: 0; }
+  .queue-title { font-size: 12px; color: #ccc; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .queue-meta { font-size: 10px; color: #555; margin-top: 2px; }
+  .queue-status { font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 12px; white-space: nowrap; }
+  .s-done { background: rgba(34,197,94,0.12); color: #22c55e; }
+  .s-progress { background: rgba(255,45,85,0.12); color: #ff2d55; }
+  .s-wait { background: rgba(100,100,100,0.12); color: #666; }
+  .progress-bar-wrap { height: 3px; background: #1e1e1e; border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .progress-bar {
+    height: 100%; background: linear-gradient(90deg, #ff2d55, #ff6b35);
+    border-radius: 2px; animation: pulse-bar 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse-bar { 0%,100%{opacity:1} 50%{opacity:0.7} }
+
+  /* FOLLOWING */
+  .filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .filter-box { background: #141414; border: 1px solid #222; border-radius: 8px; padding: 12px; }
+  .filter-box label { font-size: 10px; color: #555; display: block; margin-bottom: 6px; font-weight: 600; }
+  .following-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 10px; border-radius: 8px; border: 1px solid #1a1a1a;
+    margin-bottom: 5px; background: #141414; cursor: pointer; transition: all 0.12s;
+  }
+  .following-item:hover { border-color: #2a2a2a; }
+  .following-item.checked { border-color: rgba(255,45,85,0.3); background: rgba(255,45,85,0.04); }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; flex-shrink: 0;
+  }
+  .av-red{background:rgba(255,45,85,0.2);color:#ff2d55}
+  .av-blue{background:rgba(59,130,246,0.2);color:#60a5fa}
+  .av-green{background:rgba(34,197,94,0.2);color:#22c55e}
+  .av-purple{background:rgba(168,85,247,0.2);color:#c084fc}
+  .av-orange{background:rgba(249,115,22,0.2);color:#fb923c}
+  .av-yellow{background:rgba(234,179,8,0.2);color:#facc15}
+  .following-info { flex: 1; }
+  .following-name { font-size: 12px; color: #ccc; font-weight: 600; }
+  .following-meta { font-size: 10px; color: #555; margin-top: 1px; }
+  .dead-badge { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 10px; background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
+  .active-badge { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 10px; background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.15); }
+  .checkbox-custom {
+    width: 16px; height: 16px; border-radius: 4px;
+    border: 1px solid #333; background: #0f0f0f;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: transparent; flex-shrink: 0; transition: all 0.12s;
+  }
+  .following-item.checked .checkbox-custom { background: #ff2d55; border-color: #ff2d55; color: #fff; }
+
+  /* COOKIE CARDS */
+  .cookie-method {
+    background: #141414; border: 1px solid #222;
+    border-radius: 10px; padding: 16px; margin-bottom: 10px;
+    cursor: pointer; transition: all 0.15s; position: relative;
+  }
+  .cookie-method:hover { border-color: #333; }
+  .cookie-method.active-method { border-color: #ff2d55; background: rgba(255,45,85,0.04); }
+  .cookie-method-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .cookie-icon { font-size: 22px; }
+  .cookie-method-title { font-size: 13px; font-weight: 700; color: #fff; }
+  .cookie-method-sub { font-size: 10px; color: #555; margin-top: 1px; }
+  .cookie-method-body { font-size: 11px; color: #666; line-height: 1.6; }
+  .method-badge {
+    position: absolute; top: 12px; right: 12px;
+    font-size: 9px; font-weight: 700; padding: 2px 7px;
+    border-radius: 10px;
+  }
+  .badge-rec { background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
+  .badge-manual { background: rgba(96,165,250,0.12); color: #60a5fa; border: 1px solid rgba(96,165,250,0.25); }
+  .badge-fallback { background: rgba(251,146,60,0.12); color: #fb923c; border: 1px solid rgba(251,146,60,0.25); }
+
+  .cookie-status-panel {
+    background: #141414; border: 1px solid #1e1e1e;
+    border-radius: 8px; padding: 12px 14px; margin-top: 12px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .cookie-avatar {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: linear-gradient(135deg, #ff2d55, #ff6b35);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; flex-shrink: 0;
+  }
+  .cookie-user-name { font-size: 13px; font-weight: 700; color: #fff; }
+  .cookie-user-meta { font-size: 10px; color: #555; margin-top: 2px; }
+  .cookie-valid { color: #22c55e; font-size: 11px; font-weight: 600; }
+
+  .browser-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0 14px; }
+  .browser-card {
+    background: #141414; border: 1px solid #222;
+    border-radius: 8px; padding: 10px 12px;
+    display: flex; align-items: center; gap: 8px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .browser-card:hover { border-color: #333; }
+  .browser-card.sel { border-color: #ff2d55; background: rgba(255,45,85,0.06); }
+  .browser-icon { font-size: 20px; }
+  .browser-name { font-size: 12px; font-weight: 600; color: #ccc; }
+  .browser-path { font-size: 10px; color: #444; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* SETTINGS */
+  .settings-group { background: #141414; border: 1px solid #1e1e1e; border-radius: 10px; margin-bottom: 12px; overflow: hidden; }
+  .settings-group-title { padding: 12px 16px; font-size: 11px; font-weight: 700; color: #666; letter-spacing: 0.5px; border-bottom: 1px solid #1a1a1a; }
+  .setting-row {
+    display: flex; align-items: center; padding: 12px 16px;
+    border-bottom: 1px solid #141414; gap: 12px;
+  }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-icon { font-size: 16px; width: 24px; text-align: center; flex-shrink: 0; }
+  .setting-info { flex: 1; }
+  .setting-name { font-size: 12px; color: #ccc; font-weight: 500; }
+  .setting-desc { font-size: 10px; color: #555; margin-top: 2px; }
+  .toggle {
+    width: 36px; height: 20px; border-radius: 10px;
+    background: #2a2a2a; position: relative; cursor: pointer;
+    transition: all 0.2s; flex-shrink: 0;
+  }
+  .toggle.on { background: #ff2d55; }
+  .toggle::after {
+    content: ''; position: absolute; width: 14px; height: 14px;
+    border-radius: 50%; background: #fff; top: 3px; left: 3px;
+    transition: all 0.2s;
+  }
+  .toggle.on::after { left: 19px; }
+  .setting-input {
+    background: #0f0f0f; border: 1px solid #252525;
+    border-radius: 6px; color: #ddd; font-size: 12px;
+    padding: 5px 10px; width: 80px; outline: none; font-family: inherit; text-align: right;
+  }
+  .setting-input:focus { border-color: #ff2d55; }
+  .setting-select {
+    background: #0f0f0f; border: 1px solid #252525;
+    border-radius: 6px; color: #ddd; font-size: 12px;
+    padding: 5px 8px; outline: none; cursor: pointer; font-family: inherit;
+  }
+
+  /* HISTORY */
+  .history-filter { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .filter-chip {
+    padding: 4px 12px; border-radius: 20px;
+    font-size: 11px; font-weight: 600; cursor: pointer;
+    background: #1a1a1a; color: #666; border: 1px solid #252525; transition: all 0.15s;
+  }
+  .filter-chip:hover { color: #aaa; }
+  .filter-chip.sel { background: rgba(255,45,85,0.12); color: #ff2d55; border-color: rgba(255,45,85,0.3); }
+  .history-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 8px; border: 1px solid #1a1a1a;
+    background: #141414; margin-bottom: 5px; transition: all 0.12s;
+  }
+  .history-item:hover { border-color: #252525; }
+  .history-thumb {
+    width: 40px; height: 40px; border-radius: 6px;
+    flex-shrink: 0; display: flex; align-items: center;
+    justify-content: center; font-size: 18px;
+  }
+  .h-dl { background: rgba(255,45,85,0.1); }
+  .h-unf { background: rgba(239,68,68,0.1); }
+  .history-info { flex: 1; min-width: 0; }
+  .history-title { font-size: 12px; color: #ccc; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history-meta { font-size: 10px; color: #555; margin-top: 2px; }
+  .history-type { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 10px; white-space: nowrap; flex-shrink: 0; }
+  .ht-dl { background: rgba(255,45,85,0.12); color: #ff2d55; border: 1px solid rgba(255,45,85,0.2); }
+  .ht-unf { background: rgba(239,68,68,0.1); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
+
+  /* LOG */
+  .log-panel {
+    background: #0a0a0a; border: 1px solid #1a1a1a;
+    border-radius: 8px; padding: 10px 12px; margin-top: 14px;
+    font-family: 'Consolas', monospace; font-size: 10px;
+    line-height: 1.7; color: #555; max-height: 80px; overflow-y: auto;
+  }
+  .log-ok{color:#22c55e} .log-err{color:#f87171}
+  .log-info{color:#60a5fa} .log-warn{color:#fbbf24}
+  .log-panel::-webkit-scrollbar{width:3px}
+  .log-panel::-webkit-scrollbar-thumb{background:#2a2a2a}
+
+  /* ACTION BAR */
+  .action-bar {
+    padding: 12px 20px; border-top: 1px solid #1a1a1a;
+    display: flex; align-items: center; gap: 10px;
+    background: #0d0d0d; flex-shrink: 0;
+  }
+  .action-info { flex: 1; font-size: 11px; color: #555; }
+  .action-info span { color: #ff2d55; font-weight: 600; }
+  .action-info span.green { color: #22c55e; }
+
+  .tab-panel { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+  .tab-panel.active { display: flex; }
+
+  /* COOKIE method body toggle */
+  .method-body { display: none; margin-top: 10px; }
+  .cookie-method.active-method .method-body { display: block; }
+
+  /* STATS CARDS */
+  .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+  .stat-card { background: #141414; border: 1px solid #1e1e1e; border-radius: 8px; padding: 12px 14px; }
+  .stat-val { font-size: 20px; font-weight: 800; color: #fff; }
+  .stat-val.red { color: #ff2d55; }
+  .stat-val.green { color: #22c55e; }
+  .stat-val.blue { color: #60a5fa; }
+  .stat-label { font-size: 10px; color: #555; margin-top: 3px; }
+</style>
+</head>
+<body>
+
+<div class="titlebar">
+  <div class="titlebar-icon">🎵</div>
+  <div class="titlebar-title">TikTool &nbsp;·&nbsp; v1.0.0 beta</div>
+  <div class="titlebar-controls">
+    <div class="titlebar-btn min"></div>
+    <div class="titlebar-btn max"></div>
+    <div class="titlebar-btn close"></div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-mark">🎵</div>
+      <div>
+        <div class="logo-text">TikTool</div>
+        <div class="logo-sub">2-in-1 Desktop</div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Chức năng</div>
+      <div class="nav-item active" onclick="switchTab('download',this)">
+        <span class="nav-icon">📥</span> Download
+      </div>
+      <div class="nav-item" onclick="switchTab('unfollow',this)">
+        <span class="nav-icon">🚫</span> Unfollow
+      </div>
+    </div>
+
+    <div class="sidebar-section" style="margin-top:8px;">
+      <div class="sidebar-label">Hệ thống</div>
+      <div class="nav-item" onclick="switchTab('cookie',this)">
+        <span class="nav-icon">🍪</span> Cookie
+      </div>
+      <div class="nav-item" onclick="switchTab('settings',this)">
+        <span class="nav-icon">⚙️</span> Cài đặt
+      </div>
+      <div class="nav-item" onclick="switchTab('history',this)">
+        <span class="nav-icon">📋</span> Lịch sử
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div style="padding:6px 10px;">
+        <span class="status-dot"></span>
+        <span class="status-text">yt-dlp v2025.4.30</span>
+      </div>
+      <div style="padding:2px 10px;">
+        <span class="status-dot" style="background:#60a5fa;box-shadow:0 0 6px #60a5fa88"></span>
+        <span class="status-text">Playwright ready</span>
+      </div>
+      <div style="padding:2px 10px;">
+        <span class="status-dot" style="background:#22c55e"></span>
+        <span class="status-text">Cookie hợp lệ</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ===== DOWNLOAD ===== -->
+    <div id="tab-download" class="tab-panel active">
+      <div class="content-header">
+        <div>
+          <div class="content-title">Download Video</div>
+          <div class="content-sub">Hỗ trợ TikTok, YouTube và 1000+ trang</div>
+        </div>
+        <div class="header-badge">yt-dlp</div>
+      </div>
+      <div class="tab-bar">
+        <div class="tab active">Video đơn</div>
+        <div class="tab">Playlist</div>
+        <div class="tab">Hàng loạt</div>
+      </div>
+      <div class="scroll-area">
+        <div class="row">
+          <div class="input-wrap">
+            <span class="input-icon">🔗</span>
+            <input type="text" value="https://www.tiktok.com/@username/video/7423891234">
+          </div>
+          <button class="btn btn-primary">Phân tích</button>
+        </div>
+        <div class="section-label"><span>Định dạng xuất</span></div>
+        <div class="format-row">
+          <div class="format-card selected" onclick="selectFormat(this)">
+            <div class="format-name">🎬 MP4</div>
+            <div class="format-desc">Video H264 · Tốt nhất</div>
+          </div>
+          <div class="format-card" onclick="selectFormat(this)">
+            <div class="format-name">🎵 MP3</div>
+            <div class="format-desc">Chỉ âm thanh · 192kbps</div>
+          </div>
+          <div class="format-card" onclick="selectFormat(this)">
+            <div class="format-name">📦 MKV</div>
+            <div class="format-desc">Chất lượng gốc</div>
+          </div>
+        </div>
+        <div class="row" style="margin-bottom:16px;">
+          <div class="input-wrap">
+            <span class="input-icon">📁</span>
+            <input type="text" value="C:\Users\Thanh\Downloads\TikTok">
+          </div>
+          <button class="btn btn-ghost">Chọn...</button>
+        </div>
+        <div class="section-label">
+          <span>Hàng đợi download</span>
+          <span style="color:#555;font-weight:400">3 mục</span>
+        </div>
+        <div class="queue-item">
+          <div class="queue-thumb">🎬</div>
+          <div class="queue-info">
+            <div class="queue-title">@danceviet · Clip nhảy viral tháng 9 #trending</div>
+            <div class="queue-meta">MP4 · 1080p · 24.3 MB</div>
+            <div class="progress-bar-wrap"><div class="progress-bar" style="width:62%"></div></div>
+          </div>
+          <div class="queue-status s-progress">62%</div>
+        </div>
+        <div class="queue-item">
+          <div class="queue-thumb">🎵</div>
+          <div class="queue-info">
+            <div class="queue-title">@lofi_vn · Beat học bài chill 2025</div>
+            <div class="queue-meta">MP3 · 192kbps · 4.1 MB</div>
+          </div>
+          <div class="queue-status s-done">✓ Xong</div>
+        </div>
+        <div class="queue-item">
+          <div class="queue-thumb">🎬</div>
+          <div class="queue-info">
+            <div class="queue-title">@cooking_tips · Cách làm phở bò chuẩn vị Hà Nội</div>
+            <div class="queue-meta">MP4 · 720p · 18.7 MB</div>
+          </div>
+          <div class="queue-status s-wait">Chờ</div>
+        </div>
+        <div class="log-panel">
+          <div class="log-info">[yt-dlp] Đang tải: tiktok.com/@danceviet/video/7423...</div>
+          <div class="log-ok">[ffmpeg] Merge video+audio hoàn tất → output.mp4</div>
+          <div class="log-ok">[Done] lofi_vn_beat.mp3 → C:\Downloads\TikTok</div>
+          <div class="log-warn">[yt-dlp] Đang download fragment 4/7...</div>
+        </div>
+      </div>
+      <div class="action-bar">
+        <div class="action-info"><span>2</span> chờ · <span>1</span> đang tải · <span class="green">1</span> xong</div>
+        <button class="btn btn-ghost">Dừng tất cả</button>
+        <button class="btn btn-primary">+ Thêm URL</button>
+      </div>
+    </div>
+
+    <!-- ===== UNFOLLOW ===== -->
+    <div id="tab-unfollow" class="tab-panel">
+      <div class="content-header">
+        <div>
+          <div class="content-title">Unfollow Kênh Chết</div>
+          <div class="content-sub">Lọc và unfollow kênh không hoạt động</div>
+        </div>
+        <div class="header-badge">Playwright</div>
+      </div>
+      <div class="tab-bar">
+        <div class="tab active">Danh sách</div>
+        <div class="tab">Đã unfollow</div>
+        <div class="tab">Cài đặt lọc</div>
+      </div>
+      <div class="scroll-area">
+        <div class="filter-row">
+          <div class="filter-box">
+            <label>KÊNH CHẾT KHI KHÔNG POST HƠN</label>
+            <select><option>30 ngày</option><option selected>90 ngày</option><option>180 ngày</option><option>1 năm</option></select>
+          </div>
+          <div class="filter-box">
+            <label>CHẾ ĐỘ UNFOLLOW</label>
+            <select><option selected>Chỉ kênh chết</option><option>Không follow lại</option><option>Tất cả</option></select>
+          </div>
+        </div>
+        <div class="section-label">
+          <span>Following · <span style="color:#ff2d55">5 kênh chết</span> / 142 tổng</span>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-ghost btn-sm" onclick="selectAll()">Chọn tất cả kênh chết</button>
+            <button class="btn btn-ghost btn-sm">🔄 Tải lại</button>
+          </div>
+        </div>
+        <div id="followList">
+          <div class="following-item checked" onclick="toggleItem(this)">
+            <div class="checkbox-custom">✓</div><div class="avatar av-red">T</div>
+            <div class="following-info"><div class="following-name">@trangvlog_official</div><div class="following-meta">Bài cuối: 14 tháng trước · 2.3K followers</div></div>
+            <div class="dead-badge">Kênh chết</div>
+          </div>
+          <div class="following-item" onclick="toggleItem(this)">
+            <div class="checkbox-custom"></div><div class="avatar av-blue">M</div>
+            <div class="following-info"><div class="following-name">@minhnhat.music</div><div class="following-meta">Bài cuối: 2 ngày trước · 45.1K followers</div></div>
+            <div class="active-badge">Active</div>
+          </div>
+          <div class="following-item checked" onclick="toggleItem(this)">
+            <div class="checkbox-custom">✓</div><div class="avatar av-orange">K</div>
+            <div class="following-info"><div class="following-name">@khanh_cook_2022</div><div class="following-meta">Bài cuối: 11 tháng trước · 890 followers</div></div>
+            <div class="dead-badge">Kênh chết</div>
+          </div>
+          <div class="following-item" onclick="toggleItem(this)">
+            <div class="checkbox-custom"></div><div class="avatar av-green">L</div>
+            <div class="following-info"><div class="following-name">@lofi.daily.vn</div><div class="following-meta">Bài cuối: 5 ngày trước · 12.8K followers</div></div>
+            <div class="active-badge">Active</div>
+          </div>
+          <div class="following-item checked" onclick="toggleItem(this)">
+            <div class="checkbox-custom">✓</div><div class="avatar av-purple">H</div>
+            <div class="following-info"><div class="following-name">@hungfit_2021</div><div class="following-meta">Bài cuối: 8 tháng trước · 1.2K followers</div></div>
+            <div class="dead-badge">Kênh chết</div>
+          </div>
+          <div class="following-item" onclick="toggleItem(this)">
+            <div class="checkbox-custom"></div><div class="avatar av-blue">A</div>
+            <div class="following-info"><div class="following-name">@anhtu.travel</div><div class="following-meta">Bài cuối: 1 ngày trước · 88.4K followers</div></div>
+            <div class="active-badge">Active</div>
+          </div>
+          <div class="following-item checked" onclick="toggleItem(this)">
+            <div class="checkbox-custom">✓</div><div class="avatar av-red">B</div>
+            <div class="following-info"><div class="following-name">@banh_mi_saigon</div><div class="following-meta">Bài cuối: 13 tháng trước · 4.5K followers</div></div>
+            <div class="dead-badge">Kênh chết</div>
+          </div>
+          <div class="following-item checked" onclick="toggleItem(this)">
+            <div class="checkbox-custom">✓</div><div class="avatar av-yellow">D</div>
+            <div class="following-info"><div class="following-name">@duong.photography</div><div class="following-meta">Bài cuối: 10 tháng trước · 3.1K followers</div></div>
+            <div class="dead-badge">Kênh chết</div>
+          </div>
+        </div>
+        <div class="log-panel" id="unfollowLog">
+          <div class="log-info">[Playwright] Đã load 142 tài khoản đang follow</div>
+          <div class="log-warn">[Filter] Tìm thấy 5 kênh không post > 90 ngày</div>
+          <div class="log-ok">[API] Unfollow @trangvlog_official → thành công</div>
+          <div class="log-info">[Rate] Delay 3.2s trước lần tiếp theo...</div>
+        </div>
+      </div>
+      <div class="action-bar">
+        <div class="action-info">Đã chọn <span id="selectedCount">5</span> kênh · Delay <span>3s</span> mỗi lần</div>
+        <button class="btn btn-ghost" onclick="clearAll()">Bỏ chọn</button>
+        <button class="btn btn-primary" onclick="startUnfollow()">🚫 Bắt đầu Unfollow</button>
+      </div>
+    </div>
+
+    <!-- ===== COOKIE ===== -->
+    <div id="tab-cookie" class="tab-panel">
+      <div class="content-header">
+        <div>
+          <div class="content-title">Quản lý Cookie</div>
+          <div class="content-sub">Xác thực tài khoản TikTok để dùng chức năng Unfollow</div>
+        </div>
+        <div class="header-badge green">✓ Đã login</div>
+      </div>
+      <div class="tab-bar">
+        <div class="tab active">Phương thức</div>
+        <div class="tab">Thông tin tài khoản</div>
+      </div>
+      <div class="scroll-area">
+
+        <!-- Current session -->
+        <div class="cookie-status-panel">
+          <div class="cookie-avatar">😊</div>
+          <div style="flex:1">
+            <div class="cookie-user-name">@thanhnguyen93</div>
+            <div class="cookie-user-meta">142 following · 58 followers · TikTok VN</div>
+          </div>
+          <div>
+            <div class="cookie-valid">✓ Cookie hợp lệ</div>
+            <div style="font-size:10px;color:#555;margin-top:2px;text-align:right">Hết hạn: 45 ngày</div>
+          </div>
+          <button class="btn btn-ghost btn-sm" style="margin-left:8px">Xóa</button>
+        </div>
+
+        <div style="margin:16px 0 8px;font-size:11px;color:#444;font-weight:600;letter-spacing:0.5px;">CHỌN PHƯƠNG THỨC LẤY COOKIE</div>
+
+        <!-- Method 1: Auto from browser -->
+        <div class="cookie-method active-method" onclick="selectMethod(this,'m1')">
+          <div class="method-badge badge-rec">⭐ Khuyên dùng</div>
+          <div class="cookie-method-header">
+            <div class="cookie-icon">🌐</div>
+            <div>
+              <div class="cookie-method-title">Tự đọc từ trình duyệt</div>
+              <div class="cookie-method-sub">Đọc cookie TikTok từ Chrome/Edge đang login sẵn</div>
+            </div>
+          </div>
+          <div class="cookie-method-body">Không cần thao tác thêm. Tool tự tìm cookie TikTok trong profile trình duyệt trên máy.</div>
+          <div class="method-body">
+            <div style="margin-top:10px;">
+              <div style="font-size:10px;color:#555;margin-bottom:6px;font-weight:600;">CHỌN TRÌNH DUYỆT</div>
+              <div class="browser-list">
+                <div class="browser-card sel" onclick="selectBrowser(this)">
+                  <div class="browser-icon">🔵</div>
+                  <div>
+                    <div class="browser-name">Chrome</div>
+                    <div class="browser-path">Default profile · Tìm thấy</div>
+                  </div>
+                </div>
+                <div class="browser-card" onclick="selectBrowser(this)">
+                  <div class="browser-icon">🔷</div>
+                  <div>
+                    <div class="browser-name">Edge</div>
+                    <div class="browser-path">Default profile · Tìm thấy</div>
+                  </div>
+                </div>
+                <div class="browser-card" onclick="selectBrowser(this)">
+                  <div class="browser-icon">🦊</div>
+                  <div>
+                    <div class="browser-name">Firefox</div>
+                    <div class="browser-path">Không tìm thấy</div>
+                  </div>
+                </div>
+                <div class="browser-card" onclick="selectBrowser(this)">
+                  <div class="browser-icon">🟠</div>
+                  <div>
+                    <div class="browser-name">Brave</div>
+                    <div class="browser-path">Không tìm thấy</div>
+                  </div>
+                </div>
+              </div>
+              <button class="btn btn-success" style="width:100%" onclick="importCookie()">🔍 Đọc Cookie từ Chrome</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Method 2: Paste manual -->
+        <div class="cookie-method" onclick="selectMethod(this,'m2')">
+          <div class="method-badge badge-manual">Thủ công</div>
+          <div class="cookie-method-header">
+            <div class="cookie-icon">📋</div>
+            <div>
+              <div class="cookie-method-title">Dán cookie thủ công</div>
+              <div class="cookie-method-sub">Copy từ DevTools → paste vào đây</div>
+            </div>
+          </div>
+          <div class="cookie-method-body">Mở tiktok.com → F12 → Application → Cookies → copy toàn bộ → paste vào ô bên dưới.</div>
+          <div class="method-body">
+            <div style="margin-top:10px;">
+              <textarea rows="4" style="width:100%;margin-bottom:8px;font-family:Consolas,monospace;font-size:10px;color:#888" placeholder="sessionid=abc123; tt_webid=789...; msToken=xyz..."></textarea>
+              <button class="btn btn-blue" style="width:100%">📥 Import Cookie</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Method 3: Login in tool -->
+        <div class="cookie-method" onclick="selectMethod(this,'m3')">
+          <div class="method-badge badge-fallback">Fallback</div>
+          <div class="cookie-method-header">
+            <div class="cookie-icon">🔑</div>
+            <div>
+              <div class="cookie-method-title">Login trong tool</div>
+              <div class="cookie-method-sub">Mở TikTok web, đăng nhập, tool tự lưu cookie</div>
+            </div>
+          </div>
+          <div class="cookie-method-body">Playwright mở cửa sổ Chrome thật. Bạn login bình thường (kể cả QR code). Cookie được tự động lưu lại.</div>
+          <div class="method-body">
+            <div style="margin-top:10px;">
+              <button class="btn btn-primary" style="width:100%">🚀 Mở TikTok để Login</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="log-panel" id="cookieLog">
+          <div class="log-ok">[Cookie] Đọc thành công từ Chrome profile Default</div>
+          <div class="log-info">[Cookie] sessionid=7f3a... · msToken=Kx9z... · tt_webid=71...</div>
+          <div class="log-ok">[Verify] Đã xác thực: @thanhnguyen93 · Cookie còn hạn 45 ngày</div>
+        </div>
+      </div>
+      <div class="action-bar">
+        <div class="action-info">Session: <span class="green">@thanhnguyen93</span> · Còn hạn <span class="green">45 ngày</span></div>
+        <button class="btn btn-ghost">🔄 Kiểm tra lại</button>
+        <button class="btn btn-primary">💾 Lưu Cookie</button>
+      </div>
+    </div>
+
+    <!-- ===== SETTINGS ===== -->
+    <div id="tab-settings" class="tab-panel">
+      <div class="content-header">
+        <div>
+          <div class="content-title">Cài đặt</div>
+          <div class="content-sub">Tuỳ chỉnh hoạt động của tool</div>
+        </div>
+        <div class="header-badge blue">v1.0.0</div>
+      </div>
+      <div class="tab-bar">
+        <div class="tab active">Chung</div>
+        <div class="tab">Download</div>
+        <div class="tab">Unfollow</div>
+      </div>
+      <div class="scroll-area">
+
+        <div class="settings-group">
+          <div class="settings-group-title">⬇️ &nbsp;DOWNLOAD</div>
+          <div class="setting-row">
+            <div class="setting-icon">📁</div>
+            <div class="setting-info">
+              <div class="setting-name">Thư mục mặc định</div>
+              <div class="setting-desc">Nơi lưu file khi không chọn thư mục riêng</div>
+            </div>
+            <button class="btn btn-ghost btn-sm">Thay đổi</button>
+          </div>
+          <div class="setting-row">
+            <div class="setting-icon">🎬</div>
+            <div class="setting-info">
+              <div class="setting-name">Định dạng mặc định</div>
+              <div class="setting-desc">Format xuất khi mở tool</div>
+            </div>
+            <select class="setting-select"><option selected>MP4</option><option>MP3</option><option>MKV</option></select>
+          </div>
+          <div class="setting-row">
+            <div class="setting-icon">⚡</div>
+            <div class="setting-info">
+              <div class="setting-name">Download song song</div>
+              <div class="setting-desc">Số luồng tải cùng lúc (1–5)</div>
+            </div>
+            <input type="text" class="setting-input" value="2">
+          </div>
+          <div class="setting-row">
+            <div class="setting-icon">🔄</div>
+            <div class="setting-info">
+              <div class="setting-name">Tự cập nhật yt-dlp</div>
+              <div class="setting-desc">Kiểm tra phiên bản mới khi khởi động</div>
+            </div>
+            <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">🚫 &nbsp;UNFOLLOW</div>
+          <div class="setting-row">
+            <div class="setting-icon">⏱️</div>
+            <div class="setting-info">
+              <div class="setting-name">Delay giữa mỗi lần unfollow</div>
+              <div class="setting-desc">Giây (khuyên: 3–8s để tránh bị chặn)</div>
+            </div>
+            <input type="text" class="setting-input" value="3–6">
+          </div>
+          <div class="setting-row">
+            <div class="setting-icon">📊</div>
+            <div class="setting-info">
+              <div class="setting-name">Giới hạn mỗi phiên</div>
+              <div class="setting-desc">Unfollow tối đa X kênh rồi dừng</div>
+            </div>
+            <input type="text" class="setting-input" value="50">
+          </div>
+          <div class="setting-row">
+            <div class="setting-icon">🔀</div>
+            <div class="setting-info">
+              <div class="setting-name">Ưu tiên Internal API</div>
+              <div class="setting-desc">Thử API trước, fallback Playwright nếu lỗi</div>
+            </div>
+            <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-icon">🛡️</div>
+            <div class="setting-info">
+              <div class="setting-name">Bỏ qua kênh Friends</div>
+              <div class="setting-desc">Không unfollow kênh mutual follow</div>
+            </div>
+            <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-icon">🔔</div>
+            <div class="setting-info">
+              <div class="setting-name">Thông báo khi bị rate limit</div>
+              <div class="setting-desc">Hiện popup cảnh báo và tạm dừng</div>
+            </div>
+            <div class="toggle on" onclick="this.classList.toggle('on')"></div>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">🖥️ &nbsp;GIAO DIỆN</div>
+          <div class="setting-row">
+            <div class="setting-icon">🌙</div>
+            <div class="setting-info">
+              <div class="setting-name">Theme</div>
+              <div class="setting-desc">Màu sắc giao diện</div>
+            </div>
+            <select class="setting-select"><option selected>Dark</option><option>Light</option></select>
+          </div>
+          <div class="setting-row">
+            <div class="setting-icon">🚀</div>
+            <div class="setting-info">
+              <div class="setting-name">Khởi động cùng Windows</div>
+              <div class="setting-desc">Chạy tool khi bật máy</div>
+            </div>
+            <div class="toggle" onclick="this.classList.toggle('on')"></div>
+          </div>
+        </div>
+
+      </div>
+      <div class="action-bar">
+        <div class="action-info">Phiên bản <span>v1.0.0</span> · yt-dlp <span>2025.4.30</span></div>
+        <button class="btn btn-ghost">Đặt lại mặc định</button>
+        <button class="btn btn-primary">💾 Lưu cài đặt</button>
+      </div>
+    </div>
+
+    <!-- ===== HISTORY ===== -->
+    <div id="tab-history" class="tab-panel">
+      <div class="content-header">
+        <div>
+          <div class="content-title">Lịch sử hoạt động</div>
+          <div class="content-sub">Download và Unfollow đã thực hiện</div>
+        </div>
+        <div class="header-badge orange">127 mục</div>
+      </div>
+      <div class="tab-bar">
+        <div class="tab active">Tất cả</div>
+        <div class="tab">Download</div>
+        <div class="tab">Unfollow</div>
+      </div>
+      <div class="scroll-area">
+
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="stat-val blue">89</div>
+            <div class="stat-label">Video đã tải</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val red">38</div>
+            <div class="stat-label">Kênh đã unfollow</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-val green">12.4 GB</div>
+            <div class="stat-label">Tổng dung lượng tải</div>
+          </div>
+        </div>
+
+        <div class="history-filter">
+          <div class="filter-chip sel" onclick="setChip(this)">Tất cả</div>
+          <div class="filter-chip" onclick="setChip(this)">Hôm nay</div>
+          <div class="filter-chip" onclick="setChip(this)">Tuần này</div>
+          <div class="filter-chip" onclick="setChip(this)">Tháng này</div>
+        </div>
+
+        <div class="history-item">
+          <div class="history-thumb h-dl">🎬</div>
+          <div class="history-info">
+            <div class="history-title">@danceviet · Clip nhảy viral tháng 9 #trending</div>
+            <div class="history-meta">MP4 · 1080p · 24.3 MB · Hôm nay 14:32</div>
+          </div>
+          <div class="history-type ht-dl">Download</div>
+        </div>
+        <div class="history-item">
+          <div class="history-thumb h-unf">🚫</div>
+          <div class="history-info">
+            <div class="history-title">@trangvlog_official</div>
+            <div class="history-meta">Unfollow · Kênh chết 14 tháng · Hôm nay 13:15</div>
+          </div>
+          <div class="history-type ht-unf">Unfollow</div>
+        </div>
+        <div class="history-item">
+          <div class="history-thumb h-unf">🚫</div>
+          <div class="history-info">
+            <div class="history-title">@khanh_cook_2022</div>
+            <div class="history-meta">Unfollow · Kênh chết 11 tháng · Hôm nay 13:14</div>
+          </div>
+          <div class="history-type ht-unf">Unfollow</div>
+        </div>
+        <div class="history-item">
+          <div class="history-thumb h-dl">🎵</div>
+          <div class="history-info">
+            <div class="history-title">@lofi_vn · Beat học bài chill 2025</div>
+            <div class="history-meta">MP3 · 192kbps · 4.1 MB · Hôm nay 11:20</div>
+          </div>
+          <div class="history-type ht-dl">Download</div>
+        </div>
+        <div class="history-item">
+          <div class="history-thumb h-dl">🎬</div>
+          <div class="history-info">
+            <div class="history-title">@cooking_tips · Cách làm phở bò chuẩn vị Hà Nội</div>
+            <div class="history-meta">MP4 · 720p · 18.7 MB · Hôm qua 22:05</div>
+          </div>
+          <div class="history-type ht-dl">Download</div>
+        </div>
+        <div class="history-item">
+          <div class="history-thumb h-unf">🚫</div>
+          <div class="history-info">
+            <div class="history-title">@hungfit_2021</div>
+            <div class="history-meta">Unfollow · Kênh chết 8 tháng · Hôm qua 20:30</div>
+          </div>
+          <div class="history-type ht-unf">Unfollow</div>
+        </div>
+        <div class="history-item">
+          <div class="history-thumb h-dl">🎬</div>
+          <div class="history-info">
+            <div class="history-title">@anhtu.travel · Đà Lạt mùa hoa dã quỳ 2025</div>
+            <div class="history-meta">MP4 · 1080p · 56.2 MB · Hôm qua 19:44</div>
+          </div>
+          <div class="history-type ht-dl">Download</div>
+        </div>
+        <div class="history-item">
+          <div class="history-thumb h-dl">🎬</div>
+          <div class="history-info">
+            <div class="history-title">@minhnhat.music · Cover Người Ơi Người Ở Đừng Về</div>
+            <div class="history-meta">MP4 · 720p · 31.8 MB · 11/09/2026</div>
+          </div>
+          <div class="history-type ht-dl">Download</div>
+        </div>
+
+      </div>
+      <div class="action-bar">
+        <div class="action-info">Tổng <span>127</span> mục · <span class="green">12.4 GB</span> đã tải</div>
+        <button class="btn btn-ghost">🗑️ Xóa lịch sử</button>
+        <button class="btn btn-ghost">📤 Xuất CSV</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function switchTab(tab, el) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+function selectFormat(el) {
+  document.querySelectorAll('.format-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+function toggleItem(el) { el.classList.toggle('checked'); updateCount(); }
+function selectAll() {
+  document.querySelectorAll('.following-item').forEach(item => {
+    if (item.querySelector('.dead-badge')) item.classList.add('checked');
+  });
+  updateCount();
+}
+function clearAll() {
+  document.querySelectorAll('.following-item').forEach(i => i.classList.remove('checked'));
+  updateCount();
+}
+function updateCount() {
+  document.getElementById('selectedCount').textContent =
+    document.querySelectorAll('.following-item.checked').length;
+}
+function startUnfollow() {
+  const log = document.getElementById('unfollowLog');
+  const items = document.querySelectorAll('.following-item.checked');
+  if (!items.length) return;
+  let i = 0;
+  function next() {
+    if (i >= items.length) {
+      const l = document.createElement('div'); l.className = 'log-ok';
+      l.textContent = '[Done] Hoàn tất! Đã unfollow ' + items.length + ' kênh ✓';
+      log.appendChild(l); log.scrollTop = log.scrollHeight; return;
+    }
+    const name = items[i].querySelector('.following-name').textContent;
+    items[i].style.opacity = '0.35';
+    const l = document.createElement('div'); l.className = 'log-ok';
+    l.textContent = '[API] Unfollow ' + name + ' → thành công';
+    log.appendChild(l); log.scrollTop = log.scrollHeight; i++;
+    setTimeout(next, 800);
+  }
+  next();
+}
+function selectMethod(el, id) {
+  document.querySelectorAll('.cookie-method').forEach(m => m.classList.remove('active-method'));
+  el.classList.add('active-method');
+}
+function selectBrowser(el) {
+  document.querySelectorAll('.browser-card').forEach(b => b.classList.remove('sel'));
+  el.classList.add('sel');
+}
+function importCookie() {
+  const log = document.getElementById('cookieLog');
+  const msgs = [
+    {c:'log-info', t:'[Cookie] Đang đọc từ Chrome SQLite...'},
+    {c:'log-ok',   t:'[Cookie] Tìm thấy session TikTok hợp lệ'},
+    {c:'log-ok',   t:'[Verify] @thanhnguyen93 · Cookie còn hạn 45 ngày ✓'},
+  ];
+  let i = 0;
+  function next() {
+    if (i >= msgs.length) return;
+    const l = document.createElement('div');
+    l.className = msgs[i].c; l.textContent = msgs[i].t;
+    log.appendChild(l); log.scrollTop = log.scrollHeight; i++;
+    setTimeout(next, 700);
+  }
+  next();
+}
+function setChip(el) {
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('sel'));
+  el.classList.add('sel');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+flowchart TD
+    A([🚀 Khởi động Tool]) --> B[Nhập Cookie / Login TikTok]
+    B --> C{Cookie hợp lệ?}
+    C -- ❌ Không --> B
+    C -- ✅ Có --> D[Chọn chức năng]
+
+    D --> E1[📥 Download Video]
+    D --> E2[🚫 Unfollow Kênh]
+
+    %% ===== DOWNLOAD BRANCH =====
+    E1 --> F1[Nhập URL video / channel / playlist]
+    F1 --> F2[Chọn định dạng: MP4 / MP3 / Best]
+    F2 --> F3[Gọi yt-dlp.exe qua Process]
+    F3 --> F4{Download OK?}
+    F4 -- ✅ --> F5([✅ Lưu file xong])
+    F4 -- ❌ --> F6[Hiện lỗi + retry]
+    F6 --> F3
+
+    %% ===== UNFOLLOW BRANCH =====
+    E2 --> G1[Mở Playwright → tiktok.com]
+    G1 --> G2[Inject Cookie đã login]
+    G2 --> G3[Load danh sách Following]
+    G3 --> G4[Lấy thông tin từng kênh\nlast post date / video count]
+    G4 --> G5{Lọc kênh chết?\nVD: không post > 90 ngày}
+    G5 -- Hiện danh sách --> G6[User xem & chọn\nkênh muốn unfollow]
+    G6 --> G7[Bắt đầu Unfollow loop]
+
+    G7 --> H1{Thử Internal API\nPOST /api/unfollow}
+    H1 -- ✅ OK --> H2[Unfollow thành công]
+    H1 -- ❌ Fail / Block --> H3[Fallback: Playwright\nclick nút Unfollow trên UI]
+    H3 --> H2
+
+    H2 --> H4[Delay ngẫu nhiên\n2-5 giây]
+    H4 --> H5{Còn kênh\ncần unfollow?}
+    H5 -- ✅ Còn --> G7
+    H5 -- ❌ Xong --> H6{Rate limit\nbị TikTok chặn?}
+    H6 -- ✅ Bị chặn --> H7[Dừng / chờ 1 giờ\nrồi tiếp]
+    H7 --> G7
+    H6 -- ❌ Bình thường --> H8([✅ Unfollow hoàn tất\nHiện báo cáo])
+
+    %% Styles
+    style A fill:#6C63FF,color:#fff
+    style F5 fill:#22c55e,color:#fff
+    style H8 fill:#22c55e,color:#fff
+    style H7 fill:#f59e0b,color:#fff
+    style F6 fill:#ef4444,color:#fff

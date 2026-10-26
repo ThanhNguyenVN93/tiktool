@@ -1,0 +1,446 @@
+using Guna.UI2.WinForms;
+using Microsoft.Win32;
+using TikTool.Forms;
+using TikTool.Models;
+using TikTool.Services;
+
+namespace TikTool.Pages;
+
+internal sealed class SettingsPage : UserControl
+{
+    private const int ContentWidth = 700;
+    private const string RunRegistryKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
+
+    private readonly SettingsService _settingsService;
+
+    private TextBox _outputDirBox = null!;
+    private ComboBox _formatCombo = null!;
+    private NumericUpDown _concurrentNumeric = null!;
+    private Guna2ToggleSwitch _autoUpdateToggle = null!;
+    private ComboBox _cookieBrowserCombo = null!;
+    private ComboBox _languageCombo = null!;
+
+    private NumericUpDown _delayMinNumeric = null!;
+    private NumericUpDown _delayMaxNumeric = null!;
+    private NumericUpDown _sessionLimitNumeric = null!;
+    private Guna2ToggleSwitch _preferApiToggle = null!;
+    private Guna2ToggleSwitch _skipFriendsToggle = null!;
+    private Guna2ToggleSwitch _notifyRateLimitToggle = null!;
+
+    private Guna2ToggleSwitch _startWithWindowsToggle = null!;
+    private Guna2ToggleSwitch _minimizeToTrayToggle = null!;
+
+    private Label _savedInfo = null!;
+
+    public SettingsPage(SettingsService settingsService)
+    {
+        _settingsService = settingsService;
+
+        Dock = DockStyle.Fill;
+        BackColor = Theme.Background;
+        BuildUi();
+        LoadFromSettings();
+    }
+
+    private void BuildUi()
+    {
+        Controls.Add(BuildBody());
+        Controls.Add(BuildHeader());
+        Controls.Add(BuildActionBar());
+    }
+
+    private Control BuildHeader()
+    {
+        var header = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 64,
+            BackColor = Theme.Background,
+            Padding = new Padding(20, 14, 20, 0),
+        };
+
+        header.Controls.Add(new Label
+        {
+            Text = "Cài đặt",
+            Font = new Font("Segoe UI", 12f, FontStyle.Bold),
+            ForeColor = Color.White,
+            AutoSize = true,
+            Location = new Point(20, 12),
+        });
+        header.Controls.Add(new Label
+        {
+            Text = "Tuỳ chỉnh hành vi tải video, bỏ theo dõi và khởi động ứng dụng",
+            Font = new Font("Segoe UI", 8.5f),
+            ForeColor = Theme.TextMuted,
+            AutoSize = true,
+            Location = new Point(20, 34),
+        });
+
+        var sep = new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Theme.Border };
+        header.Controls.Add(sep);
+        return header;
+    }
+
+    private Control BuildBody()
+    {
+        var scroll = new Panel
+        {
+            Dock = DockStyle.Fill,
+            AutoScroll = true,
+            BackColor = Theme.Background,
+            Padding = new Padding(20, 16, 20, 16),
+        };
+
+        var flow = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Width = ContentWidth,
+            BackColor = Theme.Background,
+            Location = new Point(20, 16),
+        };
+
+        flow.Controls.Add(BuildGroup("TẢI VIDEO", BuildDownloadRows()));
+        flow.Controls.Add(BuildGroup("BỎ THEO DÕI", BuildUnfollowRows()));
+        flow.Controls.Add(BuildGroup("GIAO DIỆN & HỆ THỐNG", BuildAppRows()));
+        flow.Controls.Add(BuildGroup("NGÔN NGỮ", BuildLanguageRows()));
+
+        scroll.Controls.Add(flow);
+        return scroll;
+    }
+
+    private Control BuildGroup(string title, IReadOnlyList<Control> rows)
+    {
+        var wrap = new Panel { Width = ContentWidth, AutoSize = true, Margin = new Padding(0, 0, 0, 20) };
+
+        var label = new Label
+        {
+            Text = title,
+            Font = Theme.FontLabel,
+            ForeColor = ColorTranslator.FromHtml("#444444"),
+            AutoSize = true,
+            Margin = new Padding(0, 0, 0, 8),
+        };
+
+        var card = new Guna2Panel
+        {
+            Width = ContentWidth,
+            AutoSize = true,
+            BorderRadius = 8,
+            FillColor = Theme.Panel,
+            BorderColor = Theme.Border,
+            BorderThickness = 1,
+            Padding = new Padding(4, 0, 4, 0),
+        };
+
+        var rowsFlow = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            AutoSize = true,
+            Width = ContentWidth - 8,
+        };
+        foreach (var row in rows)
+        {
+            rowsFlow.Controls.Add(row);
+        }
+
+        card.Controls.Add(rowsFlow);
+
+        var host = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            AutoSize = true,
+            Width = ContentWidth,
+        };
+        host.Controls.Add(label);
+        host.Controls.Add(card);
+
+        wrap.Controls.Add(host);
+        return wrap;
+    }
+
+    private List<Control> BuildDownloadRows()
+    {
+        _outputDirBox = new TextBox
+        {
+            Width = 300,
+            BackColor = ColorTranslator.FromHtml("#161616"),
+            ForeColor = Theme.TextPrimary,
+            BorderStyle = BorderStyle.FixedSingle,
+            Font = Theme.FontRegular,
+        };
+        var btnChoose = new Guna2Button
+        {
+            Text = "Chọn...",
+            Font = Theme.FontMedium,
+            Size = new Size(80, 28),
+            FillColor = ColorTranslator.FromHtml("#1a1a1a"),
+            ForeColor = Theme.TextSecondary,
+            BorderRadius = 6,
+            Cursor = Cursors.Hand,
+        };
+        btnChoose.Click += (_, _) =>
+        {
+            using var dialog = new FolderBrowserDialog { SelectedPath = Directory.Exists(_outputDirBox.Text) ? _outputDirBox.Text : "" };
+            if (dialog.ShowDialog() == DialogResult.OK)
+            {
+                _outputDirBox.Text = dialog.SelectedPath;
+            }
+        };
+        var outputDirControl = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false };
+        outputDirControl.Controls.Add(_outputDirBox);
+        outputDirControl.Controls.Add(btnChoose);
+
+        _formatCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 120, FlatStyle = FlatStyle.Flat, BackColor = ColorTranslator.FromHtml("#161616"), ForeColor = Theme.TextPrimary };
+        _formatCombo.Items.AddRange(new object[] { "mp4", "mp3", "mkv" });
+
+        _concurrentNumeric = BuildNumeric(1, 10);
+        _autoUpdateToggle = BuildToggle();
+
+        _cookieBrowserCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 120, FlatStyle = FlatStyle.Flat, BackColor = ColorTranslator.FromHtml("#161616"), ForeColor = Theme.TextPrimary };
+        _cookieBrowserCombo.Items.AddRange(new object[] { "chrome", "edge", "firefox", "none" });
+
+        return new List<Control>
+        {
+            BuildRow("📁", "Thư mục lưu mặc định", "Nơi lưu video khi tải xong", outputDirControl),
+            BuildRow("🎬", "Định dạng mặc định", "Format được chọn sẵn khi thêm URL mới", _formatCombo),
+            BuildRow("⚡", "Số lượt tải song song", "Số video tải cùng lúc (2–3 là tối ưu trên mạng chậm/4G)", _concurrentNumeric),
+            BuildRow("🔄", "Tự động cập nhật yt-dlp", "Kiểm tra bản mới mỗi khi mở app", _autoUpdateToggle),
+            BuildRow("🍪", "Trình duyệt lấy cookie", "yt-dlp đọc cookie từ trình duyệt để tải Instagram/Facebook", _cookieBrowserCombo),
+        };
+    }
+
+    private List<Control> BuildUnfollowRows()
+    {
+        _delayMinNumeric = BuildNumeric(500, 60_000, 500);
+        _delayMaxNumeric = BuildNumeric(500, 60_000, 500);
+        var delayControl = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false };
+        delayControl.Controls.Add(_delayMinNumeric);
+        delayControl.Controls.Add(new Label { Text = "–", ForeColor = Theme.TextMuted, AutoSize = true, Margin = new Padding(6, 6, 6, 0) });
+        delayControl.Controls.Add(_delayMaxNumeric);
+        delayControl.Controls.Add(new Label { Text = "ms", ForeColor = Theme.TextMuted, AutoSize = true, Margin = new Padding(4, 6, 0, 0) });
+
+        _sessionLimitNumeric = BuildNumeric(1, 500);
+        _preferApiToggle = BuildToggle();
+        _skipFriendsToggle = BuildToggle();
+        _notifyRateLimitToggle = BuildToggle();
+
+        return new List<Control>
+        {
+            BuildRow("⏱", "Delay giữa mỗi lượt bỏ theo dõi", "Chờ ngẫu nhiên trong khoảng này để tránh bị TikTok khoá", delayControl),
+            BuildRow("🔢", "Giới hạn mỗi phiên", "Số tài khoản tối đa bỏ theo dõi trong 1 lần bấm Bắt đầu", _sessionLimitNumeric),
+            BuildRow("🌐", "Ưu tiên API trước Playwright", "Nhanh hơn; tự fallback sang trình duyệt khi API lỗi", _preferApiToggle),
+            BuildRow("🤝", "Bỏ qua bạn bè (follow qua lại)", "Không unfollow tài khoản đang follow lại mình", _skipFriendsToggle),
+            BuildRow("🔔", "Cảnh báo khi bị rate limit", "Hiện hộp thoại hỏi tiếp tục hay dừng khi TikTok chặn", _notifyRateLimitToggle),
+        };
+    }
+
+    private List<Control> BuildAppRows()
+    {
+        _startWithWindowsToggle = BuildToggle();
+        _minimizeToTrayToggle = BuildToggle();
+
+        return new List<Control>
+        {
+            BuildRow("🖥", "Khởi động cùng Windows", "Tự mở TikTool khi đăng nhập máy", _startWithWindowsToggle),
+            BuildRow("🔽", "Thu nhỏ xuống khay hệ thống", "Đóng cửa sổ sẽ ẩn app xuống system tray thay vì thoát", _minimizeToTrayToggle),
+        };
+    }
+
+    private List<Control> BuildLanguageRows()
+    {
+        _languageCombo = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = 140, FlatStyle = FlatStyle.Flat, BackColor = ColorTranslator.FromHtml("#161616"), ForeColor = Theme.TextPrimary };
+        _languageCombo.Items.AddRange(new object[] { "Tiếng Việt", "English" });
+
+        return new List<Control>
+        {
+            BuildRow("🌍", "Ngôn ngữ giao diện", "Ứng dụng sẽ tự khởi động lại khi thay đổi", _languageCombo),
+        };
+    }
+
+    private static NumericUpDown BuildNumeric(int min, int max, int increment = 1) => new()
+    {
+        Minimum = min,
+        Maximum = max,
+        Increment = increment,
+        Width = 90,
+        BackColor = ColorTranslator.FromHtml("#161616"),
+        ForeColor = Theme.TextPrimary,
+        BorderStyle = BorderStyle.FixedSingle,
+    };
+
+    private static Guna2ToggleSwitch BuildToggle() => new()
+    {
+        Size = new Size(46, 22),
+        CheckedState = { FillColor = Theme.Accent },
+        UncheckedState = { FillColor = ColorTranslator.FromHtml("#2a2a2a") },
+        Cursor = Cursors.Hand,
+    };
+
+    private static Control BuildRow(string icon, string title, string desc, Control control)
+    {
+        var row = new Panel { Width = ContentWidth - 16, Height = 60, Padding = new Padding(8, 0, 8, 0) };
+
+        var iconLabel = new Label { Text = icon, Font = new Font("Segoe UI Emoji", 14f), Size = new Size(32, 32), Location = new Point(0, 14), TextAlign = ContentAlignment.MiddleCenter, BackColor = Theme.Panel };
+        var titleLabel = new Label { Text = title, Font = new Font("Segoe UI", 9f, FontStyle.Bold), ForeColor = Theme.TextPrimary, AutoSize = true, Location = new Point(40, 10), BackColor = Theme.Panel };
+        var descLabel = new Label { Text = desc, Font = new Font("Segoe UI", 7.5f), ForeColor = Theme.TextMuted, AutoSize = true, Location = new Point(40, 30), MaximumSize = new Size(360, 0), BackColor = Theme.Panel };
+
+        if (control.AutoSize)
+        {
+            // Composite AutoSize controls (e.g. the output-dir textbox+button row) report a
+            // stale/default PreferredSize until they've been through a layout pass with a
+            // parent — force one now so positioning below uses the real width.
+            control.Size = control.GetPreferredSize(Size.Empty);
+        }
+
+        control.Location = new Point(row.Width - control.Width - 8, (row.Height - control.Height) / 2);
+        control.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+
+        row.Controls.Add(iconLabel);
+        row.Controls.Add(titleLabel);
+        row.Controls.Add(descLabel);
+        row.Controls.Add(control);
+
+        var sep = new Panel { Dock = DockStyle.Bottom, Height = 1, BackColor = Theme.Border };
+        row.Controls.Add(sep);
+
+        return row;
+    }
+
+    private Control BuildActionBar()
+    {
+        var bar = new Panel
+        {
+            Dock = DockStyle.Bottom,
+            Height = 56,
+            BackColor = ColorTranslator.FromHtml("#0d0d0d"),
+        };
+        var sep = new Panel { Dock = DockStyle.Top, Height = 1, BackColor = Theme.Border };
+
+        _savedInfo = new Label
+        {
+            Text = "",
+            Font = new Font("Segoe UI", 8.5f),
+            ForeColor = Theme.Green,
+            AutoSize = true,
+            Location = new Point(20, 18),
+        };
+
+        var btnSave = new Guna2Button
+        {
+            Text = "Lưu cài đặt",
+            Font = Theme.FontMedium,
+            Size = new Size(140, 32),
+            Location = new Point(560, 12),
+            FillColor = Theme.Accent,
+            ForeColor = Color.White,
+            BorderRadius = 7,
+            Cursor = Cursors.Hand,
+        };
+        btnSave.Click += (_, _) => SaveToSettings();
+
+        bar.Controls.Add(_savedInfo);
+        bar.Controls.Add(btnSave);
+        bar.Controls.Add(sep);
+        return bar;
+    }
+
+    private void LoadFromSettings()
+    {
+        var s = _settingsService.Current;
+        _outputDirBox.Text = s.DefaultOutputDir;
+        _formatCombo.SelectedItem = s.DefaultFormat;
+        if (_formatCombo.SelectedIndex < 0)
+        {
+            _formatCombo.SelectedIndex = 0;
+        }
+
+        _concurrentNumeric.Value = Math.Clamp(s.ConcurrentDownloads, (int)_concurrentNumeric.Minimum, (int)_concurrentNumeric.Maximum);
+        _autoUpdateToggle.Checked = s.AutoUpdateYtDlp;
+        _cookieBrowserCombo.SelectedItem = _cookieBrowserCombo.Items.Contains(s.CookieBrowser) ? s.CookieBrowser : "chrome";
+        if (_cookieBrowserCombo.SelectedIndex < 0) _cookieBrowserCombo.SelectedIndex = 0;
+
+        _delayMinNumeric.Value = Math.Clamp(s.UnfollowDelayMinMs, (int)_delayMinNumeric.Minimum, (int)_delayMinNumeric.Maximum);
+        _delayMaxNumeric.Value = Math.Clamp(s.UnfollowDelayMaxMs, (int)_delayMaxNumeric.Minimum, (int)_delayMaxNumeric.Maximum);
+        _sessionLimitNumeric.Value = Math.Clamp(s.UnfollowSessionLimit, (int)_sessionLimitNumeric.Minimum, (int)_sessionLimitNumeric.Maximum);
+        _preferApiToggle.Checked = s.PreferApiOverPlaywright;
+        _skipFriendsToggle.Checked = s.SkipFriends;
+        _notifyRateLimitToggle.Checked = s.NotifyOnRateLimit;
+
+        _startWithWindowsToggle.Checked = s.StartWithWindows;
+        _minimizeToTrayToggle.Checked = s.MinimizeToTray;
+
+        _languageCombo.SelectedIndex = s.Language == "en" ? 1 : 0;
+    }
+
+    private void SaveToSettings()
+    {
+        var min = (int)_delayMinNumeric.Value;
+        var max = (int)_delayMaxNumeric.Value;
+        if (min > max)
+        {
+            (min, max) = (max, min);
+        }
+
+        var s = _settingsService.Current;
+        s.DefaultOutputDir = _outputDirBox.Text.Trim();
+        s.DefaultFormat = _formatCombo.SelectedItem?.ToString() ?? "mp4";
+        s.ConcurrentDownloads = (int)_concurrentNumeric.Value;
+        s.AutoUpdateYtDlp = _autoUpdateToggle.Checked;
+        s.CookieBrowser = _cookieBrowserCombo.SelectedItem?.ToString() ?? "chrome";
+
+        s.UnfollowDelayMinMs = min;
+        s.UnfollowDelayMaxMs = max;
+        s.UnfollowSessionLimit = (int)_sessionLimitNumeric.Value;
+        s.PreferApiOverPlaywright = _preferApiToggle.Checked;
+        s.SkipFriends = _skipFriendsToggle.Checked;
+        s.NotifyOnRateLimit = _notifyRateLimitToggle.Checked;
+
+        s.StartWithWindows = _startWithWindowsToggle.Checked;
+        s.MinimizeToTray = _minimizeToTrayToggle.Checked;
+
+        var newLang = _languageCombo.SelectedIndex == 1 ? "en" : "vi";
+        var langChanged = newLang != s.Language;
+        s.Language = newLang;
+
+        _settingsService.Save();
+        ApplyStartWithWindows(s.StartWithWindows);
+
+        if (langChanged)
+        {
+            _savedInfo.Text = "✓ Đã lưu — đang khởi động lại…";
+            // Delay để user thấy message trước khi restart
+            var timer = new System.Windows.Forms.Timer { Interval = 800 };
+            timer.Tick += (_, _) => { timer.Stop(); Application.Restart(); };
+            timer.Start();
+        }
+        else
+        {
+            _savedInfo.Text = $"✓ Đã lưu lúc {DateTime.Now:HH:mm:ss}";
+        }
+    }
+
+    private static void ApplyStartWithWindows(bool enabled)
+    {
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(RunRegistryKey, writable: true);
+            if (enabled)
+            {
+                key?.SetValue("TikTool", $"\"{Application.ExecutablePath}\"");
+            }
+            else
+            {
+                key?.DeleteValue("TikTool", throwOnMissingValue: false);
+            }
+        }
+        catch
+        {
+            // Best effort — thiếu quyền registry không nên chặn việc lưu các cài đặt khác.
+        }
+    }
+}

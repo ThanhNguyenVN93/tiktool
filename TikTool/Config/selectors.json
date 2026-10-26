@@ -1,0 +1,12 @@
+{
+  "version": "1.0.6",
+  "updated": "2026-09-13",
+  "unfollow_btn": "[data-e2e='follow-button']",
+  "profile_page_url": "https://www.tiktok.com/@{username}?lang=en",
+  "profile_following_stat": "[data-e2e='following']",
+  "following_item": "[data-e2e='following-user-button']",
+  "following_username": "[data-e2e='following-user-desc']",
+  "following_nickname": "[data-e2e='following-user-title']",
+  "api_unfollow_endpoint": "https://www.tiktok.com/api/relation/user/unfollow/",
+  "api_verify_endpoint": "https://www.tiktok.com/passport/web/account/info/"
+}
