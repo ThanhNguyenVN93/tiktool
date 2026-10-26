@@ -52,7 +52,7 @@ internal sealed class CookiePage : UserControl
             }
             catch (Exception ex)
             {
-                _log.Log($"[Cookie] Lỗi khi nạp cookie đã lưu: {ex.Message}", LogLevel.Error);
+                _log.Log(T($"[Cookie] Lỗi khi nạp cookie đã lưu: {ex.Message}", $"[Cookie] Error loading saved cookie: {ex.Message}"), LogLevel.Error);
             }
         }));
     }
@@ -79,7 +79,7 @@ internal sealed class CookiePage : UserControl
 
         var title = new Label
         {
-            Text = "Quản lý Cookie",
+            Text = T("Quản lý Cookie", "Cookie Manager"),
             Font = new Font("Segoe UI", 12f, FontStyle.Bold),
             ForeColor = Color.White,
             AutoSize = true,
@@ -87,7 +87,8 @@ internal sealed class CookiePage : UserControl
         };
         var subtitle = new Label
         {
-            Text = "Xác thực tài khoản TikTok để dùng chức năng Bỏ theo dõi",
+            Text = T("Xác thực tài khoản TikTok để dùng chức năng Bỏ theo dõi",
+                     "Authenticate your TikTok account to use the Unfollow feature"),
             Font = new Font("Segoe UI", 8.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = true,
@@ -96,7 +97,7 @@ internal sealed class CookiePage : UserControl
 
         _headerBadge = new Label
         {
-            Text = "Chưa có cookie",
+            Text = T("Chưa có cookie", "No cookie"),
             Font = Theme.FontLabel,
             AutoSize = true,
             Padding = new Padding(8, 4, 8, 4),
@@ -161,7 +162,7 @@ internal sealed class CookiePage : UserControl
 
         var sectionLabel = new Label
         {
-            Text = "CHỌN PHƯƠNG THỨC LẤY COOKIE",
+            Text = T("CHỌN PHƯƠNG THỨC LẤY COOKIE", "CHOOSE A COOKIE METHOD"),
             Font = Theme.FontLabel,
             ForeColor = ColorTranslator.FromHtml("#444444"),
             AutoSize = true,
@@ -246,7 +247,7 @@ internal sealed class CookiePage : UserControl
 
         var nameLabel = new Label
         {
-            Text = cookie.Username is null ? "(chưa xác thực)" : $"@{cookie.Username}",
+            Text = cookie.Username is null ? T("(chưa xác thực)", "(not verified)") : $"@{cookie.Username}",
             Font = new Font("Segoe UI", 10f, FontStyle.Bold),
             ForeColor = Color.White,
             AutoSize = false,
@@ -257,7 +258,7 @@ internal sealed class CookiePage : UserControl
         };
         var metaLabel = new Label
         {
-            Text = $"Nguồn: {cookie.Source} · Lấy lúc {cookie.CapturedAt:HH:mm dd/MM}",
+            Text = T($"Nguồn: {cookie.Source} · Lấy lúc {cookie.CapturedAt:HH:mm dd/MM}", $"Source: {cookie.Source} · Captured {cookie.CapturedAt:HH:mm dd/MM}"),
             Font = new Font("Segoe UI", 8f),
             ForeColor = Theme.TextMuted,
             AutoSize = false,
@@ -269,7 +270,7 @@ internal sealed class CookiePage : UserControl
 
         var validLabel = new Label
         {
-            Text = cookie.Username is not null ? "✓ Cookie hợp lệ" : "○ Chưa kiểm tra",
+            Text = cookie.Username is not null ? T("✓ Cookie hợp lệ", "✓ Cookie valid") : T("○ Chưa kiểm tra", "○ Not verified"),
             Font = new Font("Segoe UI", 8.5f, FontStyle.Bold),
             ForeColor = cookie.Username is not null ? Theme.Green : Theme.TextMuted,
             AutoSize = false,
@@ -280,7 +281,7 @@ internal sealed class CookiePage : UserControl
         };
         var daysLabel = new Label
         {
-            Text = cookie.DaysLeft is int d ? $"Hết hạn: {d} ngày" : "",
+            Text = cookie.DaysLeft is int d ? T($"Hết hạn: {d} ngày", $"Expires in {d} days") : "",
             Font = new Font("Segoe UI", 7.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = false,
@@ -292,7 +293,7 @@ internal sealed class CookiePage : UserControl
 
         var btnDelete = new Guna2Button
         {
-            Text = "Xóa",
+            Text = T("Xóa", "Delete"),
             Font = Theme.FontMedium,
             Size = new Size(60, 28),
             Location = new Point(ContentWidth - 76, 18),
@@ -323,7 +324,7 @@ internal sealed class CookiePage : UserControl
 
     private CookieMethodCard BuildMethodCardChrome()
     {
-        var card = new CookieMethodCard(ContentWidth, "🌐", "Tự đọc từ trình duyệt", "Đọc cookie TikTok từ Chrome/Edge đang login sẵn", "⭐ Khuyên dùng", Theme.Green);
+        var card = new CookieMethodCard(ContentWidth, "🌐", T("Tự đọc từ trình duyệt", "Auto-read from browser"), T("Đọc cookie TikTok từ Chrome/Edge đang login sẵn", "Read TikTok cookie from logged-in Chrome/Edge"), T("⭐ Khuyên dùng", "⭐ Recommended"), Theme.Green);
         card.OnExpand += () => SelectCard(card);
         _methodCards.Add(card);
 
@@ -335,7 +336,7 @@ internal sealed class CookiePage : UserControl
 
         _btnReadBrowser = new Guna2Button
         {
-            Text = "🔍  Đọc Cookie từ Chrome",
+            Text = T("🔍  Đọc Cookie từ Chrome", "🔍  Read Cookie from Chrome"),
             Font = Theme.FontMedium,
             Width = ContentWidth - 32,
             Height = 34,
@@ -370,7 +371,7 @@ internal sealed class CookiePage : UserControl
         var lblName = new Label { Text = name, Font = Theme.FontMedium, ForeColor = Theme.TextSecondary, Location = new Point(40, 6), Size = new Size(100, 18), AutoSize = false, TextAlign = ContentAlignment.MiddleLeft, BackColor = boxBg, Cursor = Cursors.Hand };
         var lblStatus = new Label
         {
-            Text = installed ? "Tìm thấy" : "Không tìm thấy",
+            Text = installed ? T("Tìm thấy", "Found") : T("Không tìm thấy", "Not found"),
             Font = new Font("Segoe UI", 7f),
             ForeColor = installed ? Theme.TextMuted : ColorTranslator.FromHtml("#663333"),
             Location = new Point(40, 24),
@@ -392,7 +393,7 @@ internal sealed class CookiePage : UserControl
             _selectedBrowser = browser;
             _chromeCard.BorderColor = browser == CookieBrowser.Chrome ? Theme.Accent : Theme.Border;
             _edgeCard.BorderColor = browser == CookieBrowser.Edge ? Theme.Accent : Theme.Border;
-            _btnReadBrowser.Text = $"🔍  Đọc Cookie từ {name}";
+            _btnReadBrowser.Text = T($"🔍  Đọc Cookie từ {name}", $"🔍  Read Cookie from {name}");
         };
         box.Click += select;
         lblIcon.Click += select;
@@ -403,7 +404,7 @@ internal sealed class CookiePage : UserControl
 
     private CookieMethodCard BuildMethodCardPaste()
     {
-        var card = new CookieMethodCard(ContentWidth, "📋", "Dán cookie thủ công", "Copy từ DevTools → paste vào đây", "Thủ công", Theme.Blue);
+        var card = new CookieMethodCard(ContentWidth, "📋", T("Dán cookie thủ công", "Paste cookie manually"), T("Copy từ DevTools → paste vào đây", "Copy from DevTools → paste here"), T("Thủ công", "Manual"), Theme.Blue);
         card.OnExpand += () => SelectCard(card);
         _methodCards.Add(card);
 
@@ -440,13 +441,13 @@ internal sealed class CookiePage : UserControl
 
     private CookieMethodCard BuildMethodCardLogin()
     {
-        var card = new CookieMethodCard(ContentWidth, "🔑", "Login trong tool", "Mở TikTok web, đăng nhập, tool tự lưu cookie", "Fallback", Theme.Orange);
+        var card = new CookieMethodCard(ContentWidth, "🔑", T("Login trong tool", "Login in-tool"), T("Mở TikTok web, đăng nhập, tool tự lưu cookie", "Opens TikTok web, log in, tool saves cookie automatically"), "Fallback", Theme.Orange);
         card.OnExpand += () => SelectCard(card);
         _methodCards.Add(card);
 
         var btnLogin = new Guna2Button
         {
-            Text = "🚀  Mở TikTok để Login",
+            Text = T("🚀  Mở TikTok để Login", "🚀  Open TikTok to Login"),
             Font = Theme.FontMedium,
             Width = ContentWidth - 32,
             Height = 34,
@@ -474,7 +475,7 @@ internal sealed class CookiePage : UserControl
 
         _actionInfo = new Label
         {
-            Text = "Chưa có cookie nào được lưu",
+            Text = T("Chưa có cookie nào được lưu", "No cookie saved yet"),
             Font = new Font("Segoe UI", 8.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = true,
@@ -483,7 +484,7 @@ internal sealed class CookiePage : UserControl
 
         _btnSave = new Guna2Button
         {
-            Text = "Lưu Cookie",
+            Text = T("Lưu Cookie", "Save Cookie"),
             Font = Theme.FontMedium,
             Size = new Size(110, 32),
             Location = new Point(560, 12),
@@ -496,7 +497,7 @@ internal sealed class CookiePage : UserControl
 
         _btnReverify = new Guna2Button
         {
-            Text = "Kiểm tra lại",
+            Text = T("Kiểm tra lại", "Verify again"),
             Font = Theme.FontMedium,
             Size = new Size(110, 32),
             Location = new Point(430, 12),
@@ -519,12 +520,13 @@ internal sealed class CookiePage : UserControl
         var cookie = await _cookieService.LoadCookieAsync();
         if (cookie is null)
         {
-            _log.Log("[Cookie] Chưa có cookie nào được lưu trên máy", LogLevel.Info);
+            _log.Log(T("[Cookie] Chưa có cookie nào được lưu trên máy", "[Cookie] No cookie saved on this machine"), LogLevel.Info);
             return;
         }
 
         _currentCookie = cookie;
-        _log.Log($"[Cookie] Đã nạp cookie đã lưu (nguồn: {cookie.Source}, lúc {cookie.CapturedAt:HH:mm dd/MM})", LogLevel.Info);
+        _log.Log(T($"[Cookie] Đã nạp cookie đã lưu (nguồn: {cookie.Source}, lúc {cookie.CapturedAt:HH:mm dd/MM})",
+                   $"[Cookie] Loaded saved cookie (source: {cookie.Source}, at {cookie.CapturedAt:HH:mm dd/MM})"), LogLevel.Info);
         RenderStatusPanel();
         UpdateHeaderAndActionBar();
     }
@@ -541,7 +543,7 @@ internal sealed class CookiePage : UserControl
                 return;
             }
 
-            _log.Log("[Cookie] Tìm thấy session TikTok hợp lệ", LogLevel.Ok);
+            _log.Log(T("[Cookie] Tìm thấy session TikTok hợp lệ", "[Cookie] Found valid TikTok session"), LogLevel.Ok);
             await AdoptCookieAsync(cookie);
         }
         finally
@@ -555,15 +557,17 @@ internal sealed class CookiePage : UserControl
     /// themselves and click the button again.</summary>
     private async Task<TikTokCookie?> ReadFromBrowserWithRetryAsync(string name, bool allowKillRetry)
     {
-        _log.Log($"[Cookie] Đang đọc từ {name} SQLite...", LogLevel.Info);
+        _log.Log(T($"[Cookie] Đang đọc từ {name} SQLite...", $"[Cookie] Reading from {name} SQLite..."), LogLevel.Info);
         try
         {
             var cookie = await _cookieService.ReadFromChromiumBrowser(_selectedBrowser);
             if (cookie is null)
             {
                 _log.Log(
-                    $"[Cookie] Không tìm thấy session TikTok đã login trong {name} (đã quét tất cả profile: Default, Profile 1, 2...). " +
-                    "Kiểm tra: bạn có đang login TikTok đúng bằng trình duyệt này không, hay dùng trình duyệt/app khác? Thử đăng xuất rồi đăng nhập lại TikTok trên đúng profile Chrome này.",
+                    T($"[Cookie] Không tìm thấy session TikTok đã login trong {name} (đã quét tất cả profile: Default, Profile 1, 2...). " +
+                      "Kiểm tra: bạn có đang login TikTok đúng bằng trình duyệt này không, hay dùng trình duyệt/app khác? Thử đăng xuất rồi đăng nhập lại TikTok trên đúng profile Chrome này.",
+                      $"[Cookie] No logged-in TikTok session found in {name} (scanned all profiles: Default, Profile 1, 2...). " +
+                      "Check: are you logged into TikTok in this browser, or using a different browser/app? Try signing out and back in on this Chrome profile."),
                     LogLevel.Error);
             }
 
@@ -574,19 +578,22 @@ internal sealed class CookiePage : UserControl
             _log.Log($"[Cookie] {ex.Message}", LogLevel.Warn);
 
             var choice = MessageBox.Show(
-                $"{name} đang mở nên khóa file cookie.\n\nCho phép TikTool tự đóng {name} để đọc cookie? " +
-                $"Tất cả tab đang mở trong {name} sẽ bị đóng ngay lập tức (không lưu).",
-                "TikTool — Đóng trình duyệt?",
+                T($"{name} đang mở nên khóa file cookie.\n\nCho phép TikTool tự đóng {name} để đọc cookie? " +
+                  $"Tất cả tab đang mở trong {name} sẽ bị đóng ngay lập tức (không lưu).",
+                  $"{name} is open and has the cookie file locked.\n\nAllow TikTool to close {name} to read the cookie? " +
+                  $"All open tabs in {name} will be closed immediately (unsaved)."),
+                T("TikTool — Đóng trình duyệt?", "TikTool — Close browser?"),
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning);
 
             if (choice != DialogResult.Yes)
             {
-                _log.Log($"[Cookie] Đã huỷ — hãy tự đóng hoàn toàn {name} (kể cả icon khay hệ thống) rồi bấm lại.", LogLevel.Warn);
+                _log.Log(T($"[Cookie] Đã huỷ — hãy tự đóng hoàn toàn {name} (kể cả icon khay hệ thống) rồi bấm lại.",
+                           $"[Cookie] Cancelled — please close {name} completely (including system tray icon) then click again."), LogLevel.Warn);
                 return null;
             }
 
-            _log.Log($"[Cookie] Đang đóng {name}...", LogLevel.Info);
+            _log.Log(T($"[Cookie] Đang đóng {name}...", $"[Cookie] Closing {name}..."), LogLevel.Info);
             await Task.Run(() => CookieService.KillBrowserProcesses(_selectedBrowser));
             await Task.Delay(500);
 
@@ -594,7 +601,7 @@ internal sealed class CookiePage : UserControl
         }
         catch (Exception ex)
         {
-            _log.Log($"[Cookie] Lỗi khi đọc cookie: {ex.Message}", LogLevel.Error);
+            _log.Log(T($"[Cookie] Lỗi khi đọc cookie: {ex.Message}", $"[Cookie] Error reading cookie: {ex.Message}"), LogLevel.Error);
             return null;
         }
     }
@@ -604,14 +611,14 @@ internal sealed class CookiePage : UserControl
         var raw = _pasteBox.Text;
         if (string.IsNullOrWhiteSpace(raw))
         {
-            _log.Log("[Cookie] Chưa nhập chuỗi cookie để import", LogLevel.Warn);
+            _log.Log(T("[Cookie] Chưa nhập chuỗi cookie để import", "[Cookie] No cookie string entered to import"), LogLevel.Warn);
             return;
         }
 
         try
         {
             var cookie = CookieService.ParseCookieString(raw);
-            _log.Log("[Cookie] Đã parse cookie thủ công thành công", LogLevel.Ok);
+            _log.Log(T("[Cookie] Đã parse cookie thủ công thành công", "[Cookie] Manually pasted cookie parsed successfully"), LogLevel.Ok);
             await AdoptCookieAsync(cookie);
         }
         catch (Exception ex)
@@ -637,9 +644,9 @@ internal sealed class CookiePage : UserControl
         _loginInProgress = true;
         trigger.Enabled = false;
         var originalText = trigger.Text;
-        trigger.Text = "⏳  Đang chờ đăng nhập...";
+        trigger.Text = T("⏳  Đang chờ đăng nhập...", "⏳  Waiting for login...");
 
-        _log.Log("[Login] Đang mở Chrome thật cho bạn đăng nhập TikTok...", LogLevel.Info);
+        _log.Log(T("[Login] Đang mở Chrome thật cho bạn đăng nhập TikTok...", "[Login] Opening real Chrome for you to log in to TikTok..."), LogLevel.Info);
         try
         {
             using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(5));
@@ -647,16 +654,17 @@ internal sealed class CookiePage : UserControl
 
             if (cookie is null)
             {
-                _log.Log("[Login] Đã đóng cửa sổ hoặc hết thời gian chờ (5 phút) mà chưa đăng nhập xong.", LogLevel.Warn);
+                _log.Log(T("[Login] Đã đóng cửa sổ hoặc hết thời gian chờ (5 phút) mà chưa đăng nhập xong.",
+                           "[Login] Window closed or timed out (5 min) before login completed."), LogLevel.Warn);
                 return;
             }
 
-            _log.Log("[Login] Đăng nhập thành công — đã bắt được session.", LogLevel.Ok);
+            _log.Log(T("[Login] Đăng nhập thành công — đã bắt được session.", "[Login] Login successful — session captured."), LogLevel.Ok);
             await AdoptCookieAsync(cookie);
         }
         catch (OperationCanceledException)
         {
-            _log.Log("[Login] Đã hết thời gian chờ đăng nhập (5 phút).", LogLevel.Warn);
+            _log.Log(T("[Login] Đã hết thời gian chờ đăng nhập (5 phút).", "[Login] Login timed out (5 minutes)."), LogLevel.Warn);
         }
         catch (Exception ex)
         {
@@ -683,12 +691,12 @@ internal sealed class CookiePage : UserControl
     {
         if (_currentCookie is null)
         {
-            _log.Log("[Verify] Chưa có cookie để kiểm tra", LogLevel.Warn);
+            _log.Log(T("[Verify] Chưa có cookie để kiểm tra", "[Verify] No cookie to verify"), LogLevel.Warn);
             return;
         }
 
         _btnReverify.Enabled = false;
-        _log.Log("[Verify] Đang xác thực với TikTok...", LogLevel.Info);
+        _log.Log(T("[Verify] Đang xác thực với TikTok...", "[Verify] Verifying with TikTok..."), LogLevel.Info);
         try
         {
             var result = await _cookieService.VerifyCookieAsync(_currentCookie);
@@ -696,7 +704,8 @@ internal sealed class CookiePage : UserControl
             {
                 _currentCookie.Username = result.Username;
                 var days = _currentCookie.DaysLeft;
-                _log.Log($"[Verify] Đã xác thực: @{result.Username}" + (days is int d ? $" · Cookie còn hạn {d} ngày" : ""), LogLevel.Ok);
+                _log.Log(T($"[Verify] Đã xác thực: @{result.Username}" + (days is int d ? $" · Cookie còn hạn {d} ngày" : ""),
+                           $"[Verify] Verified: @{result.Username}" + (days is int d2 ? $" · Cookie expires in {d2} days" : "")), LogLevel.Ok);
                 await SaveCurrentCookieAsync(silent: true);
             }
             else
@@ -718,7 +727,7 @@ internal sealed class CookiePage : UserControl
         {
             if (!silent)
             {
-                _log.Log("[Cookie] Không có cookie để lưu", LogLevel.Warn);
+                _log.Log(T("[Cookie] Không có cookie để lưu", "[Cookie] No cookie to save"), LogLevel.Warn);
             }
             return;
         }
@@ -726,7 +735,8 @@ internal sealed class CookiePage : UserControl
         await _cookieService.SaveCookieAsync(_currentCookie);
         if (!silent)
         {
-            _log.Log("[Cookie] Đã lưu cookie (mã hoá DPAPI) vào %APPDATA%\\TikTool\\cookie.json", LogLevel.Ok);
+            _log.Log(T("[Cookie] Đã lưu cookie (mã hoá DPAPI) vào %APPDATA%\\TikTool\\cookie.json",
+                       "[Cookie] Cookie saved (DPAPI-encrypted) to %APPDATA%\\TikTool\\cookie.json"), LogLevel.Ok);
         }
         UpdateHeaderAndActionBar();
     }
@@ -737,26 +747,27 @@ internal sealed class CookiePage : UserControl
         _currentCookie = null;
         RenderStatusPanel();
         UpdateHeaderAndActionBar();
-        _log.Log("[Cookie] Đã xoá cookie đã lưu", LogLevel.Warn);
+        _log.Log(T("[Cookie] Đã xoá cookie đã lưu", "[Cookie] Saved cookie deleted"), LogLevel.Warn);
     }
 
     private void UpdateHeaderAndActionBar()
     {
         if (_currentCookie is null)
         {
-            _headerBadge.Text = "Chưa có cookie";
+            _headerBadge.Text = T("Chưa có cookie", "No cookie");
             _headerBadge.ForeColor = Theme.TextMuted;
-            _actionInfo.Text = "Chưa có cookie nào được lưu";
+            _actionInfo.Text = T("Chưa có cookie nào được lưu", "No cookie saved yet");
             return;
         }
 
         var loggedIn = _currentCookie.Username is not null;
-        _headerBadge.Text = loggedIn ? "✓ Đã login" : "Cookie chưa xác thực";
+        _headerBadge.Text = loggedIn ? T("✓ Đã login", "✓ Logged in") : T("Cookie chưa xác thực", "Cookie not verified");
         _headerBadge.ForeColor = loggedIn ? Theme.Green : Theme.Orange;
 
         _actionInfo.Text = loggedIn
-            ? $"Session: @{_currentCookie.Username} · Còn hạn {_currentCookie.DaysLeft?.ToString() ?? "?"} ngày"
-            : "Cookie đã lưu nhưng chưa xác thực — bấm Kiểm tra lại";
+            ? T($"Session: @{_currentCookie.Username} · Còn hạn {_currentCookie.DaysLeft?.ToString() ?? "?"} ngày",
+                $"Session: @{_currentCookie.Username} · Expires in {_currentCookie.DaysLeft?.ToString() ?? "?"} days")
+            : T("Cookie đã lưu nhưng chưa xác thực — bấm Kiểm tra lại", "Cookie saved but not verified — click Verify again");
 
         CookieStatusChanged?.Invoke();
     }

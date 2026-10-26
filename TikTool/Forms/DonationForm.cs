@@ -7,7 +7,7 @@ internal sealed class DonationForm : Form
 {
     public DonationForm()
     {
-        Text = "TikTool — Đóng góp";
+        Text = T("TikTool — Đóng góp", "TikTool — Donate");
         Size = new Size(420, 560);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -23,7 +23,7 @@ internal sealed class DonationForm : Form
     {
         var title = new Label
         {
-            Text = "Ủng hộ tác giả ☕",
+            Text = T("Ủng hộ tác giả ☕", "Support the author ☕"),
             Font = new Font("Segoe UI", 13f, FontStyle.Bold),
             ForeColor = Color.White,
             AutoSize = true,
@@ -32,7 +32,7 @@ internal sealed class DonationForm : Form
 
         var sub = new Label
         {
-            Text = "Mọi khoản ủng hộ giúp duy trì và phát triển TikTool.",
+            Text = T("Mọi khoản ủng hộ giúp duy trì và phát triển TikTool.", "Every contribution helps maintain and grow TikTool."),
             Font = new Font("Segoe UI", 8.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = true,
@@ -43,7 +43,7 @@ internal sealed class DonationForm : Form
 
         var momoLabel = new Label
         {
-            Text = "MoMo — quét QR bên dưới:",
+            Text = T("MoMo — quét QR bên dưới:", "MoMo — scan QR below:"),
             Font = new Font("Segoe UI", 9f, FontStyle.Bold),
             ForeColor = Theme.TextSecondary,
             AutoSize = true,
@@ -70,7 +70,7 @@ internal sealed class DonationForm : Form
             picBox.BackColor = Theme.Panel;
             picBox.Controls.Add(new Label
             {
-                Text = "momo.jpg không tìm thấy",
+                Text = T("momo.jpg không tìm thấy", "momo.jpg not found"),
                 ForeColor = Theme.TextMuted,
                 AutoSize = true,
                 Location = new Point(80, 148),
@@ -79,7 +79,7 @@ internal sealed class DonationForm : Form
 
         var kofiBtn = new Guna2Button
         {
-            Text = "☕  Ko-fi — ủng hộ online",
+            Text = T("☕  Ko-fi — ủng hộ online", "☕  Ko-fi — donate online"),
             Font = Theme.FontMedium,
             Size = new Size(200, 36),
             Location = new Point(110, 444),
@@ -96,7 +96,7 @@ internal sealed class DonationForm : Form
 
         var closeBtn = new Guna2Button
         {
-            Text = "Đóng",
+            Text = T("Đóng", "Close"),
             Font = Theme.FontMedium,
             Size = new Size(90, 32),
             Location = new Point(310, 492),
