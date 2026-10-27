@@ -114,7 +114,7 @@ internal sealed class SettingsPage : UserControl
         flow.Controls.Add(BuildGroup(T("TẢI VIDEO", "DOWNLOAD"), BuildDownloadRows()));
         flow.Controls.Add(BuildGroup(T("BỎ THEO DÕI", "UNFOLLOW"), BuildUnfollowRows()));
         flow.Controls.Add(BuildGroup("YOUTUBE", BuildYouTubeRows()));
-        flow.Controls.Add(BuildGroup(T("GIAO DIỆN & HỆ THỐNG", "INTERFACE & SYSTEM"), BuildAppRows()));
+        flow.Controls.Add(BuildGroup(T("GIAO DIỆN && HỆ THỐNG", "INTERFACE && SYSTEM"), BuildAppRows()));
         flow.Controls.Add(BuildGroup(T("NGÔN NGỮ", "LANGUAGE"), BuildLanguageRows()));
 
         scroll.Controls.Add(flow);

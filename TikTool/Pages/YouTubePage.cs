@@ -261,19 +261,19 @@ internal sealed class YouTubePage : UserControl
             ForeColor = ColorTranslator.FromHtml("#444444"),
             AutoSize = false,
             AutoEllipsis = true,
-            Size = new Size(Math.Max(120, ContentWidth - 150 - 8 - 170 - 8 - 170 - 12), 18),
+            Size = new Size(Math.Max(120, ContentWidth - 150 - 8 - 205 - 8 - 215 - 12), 18),
             Location = new Point(0, 6),
         };
 
         _btnConnect = MakeButton("", new Size(150, 28), new Point(ContentWidth - 150, 0), Theme.Accent, Color.White);
         _btnConnect.Click += async (_, _) => await ConnectAndLoadAsync();
 
-        _btnSelectInactive = MakeButton(T("💤  Chọn không hoạt động", "💤  Select inactive"), new Size(170, 28),
-            new Point(ContentWidth - 150 - 8 - 170, 0), quiet, Theme.TextSecondary);
+        _btnSelectInactive = MakeButton(T("💤  Chọn không hoạt động", "💤  Select inactive"), new Size(205, 28),
+            new Point(ContentWidth - 150 - 8 - 205, 0), quiet, Theme.TextSecondary);
         _btnSelectInactive.Click += (_, _) => SelectInactive();
 
-        _btnSelectShown = MakeButton(T("☑  Chọn tất cả đang hiện", "☑  Select all shown"), new Size(170, 28),
-            new Point(ContentWidth - 150 - 8 - 170 - 8 - 170, 0), quiet, Theme.TextSecondary);
+        _btnSelectShown = MakeButton(T("☑  Chọn tất cả đang hiện", "☑  Select all shown"), new Size(215, 28),
+            new Point(ContentWidth - 150 - 8 - 205 - 8 - 215, 0), quiet, Theme.TextSecondary);
         _btnSelectShown.Click += (_, _) => SelectShown();
 
         _emptyHint = new Label

@@ -296,7 +296,7 @@ public sealed class MainForm : Form
         };
         var sub = new Label
         {
-            Text = "Download & clean up",
+            Text = "Download && clean up",
             Font = new Font("Segoe UI", 7.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = true,

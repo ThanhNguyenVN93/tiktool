@@ -135,13 +135,17 @@ internal sealed class HistoryPage : UserControl
 
         var iconLabel = new Label { Text = icon, Font = new Font("Segoe UI Emoji", 14f), AutoSize = true, Location = new Point(12, 10), BackColor = Theme.Panel };
         var valueLabel = new Label { Text = "0", Font = new Font("Segoe UI", 16f, FontStyle.Bold), ForeColor = Color.White, AutoSize = true, Location = new Point(12, 32), BackColor = Theme.Panel };
-        var titleLabel = new Label { Text = title, Font = new Font("Segoe UI", 7.5f), ForeColor = Theme.TextMuted, AutoSize = true, Location = new Point(46, 14), BackColor = Theme.Panel };
+        var titleLabel = new Label { Text = title, Font = new Font("Segoe UI", 7.5f), ForeColor = Theme.TextMuted, AutoSize = true, Location = new Point(58, 14), BackColor = Theme.Panel };
 
         card.Controls.Add(iconLabel);
         card.Controls.Add(titleLabel);
         card.Controls.Add(valueLabel);
         return (card, valueLabel);
     }
+
+    /// <summary>Details are stored in the language the app had at the time; the one fixed phrase we write is shown in the current language.</summary>
+    private static string LocalizeDetail(string detail) =>
+        detail is "No videos" or "Không có video" ? T("Không có video", "No videos") : detail;
 
     private Control BuildFilterRow()
     {
@@ -168,7 +172,7 @@ internal sealed class HistoryPage : UserControl
             Text = text,
             Tag = key,
             Font = Theme.FontMedium,
-            Size = new Size(90, 28),
+            Size = new Size(Math.Max(84, TextRenderer.MeasureText(text, Theme.FontMedium).Width + 36), 28),
             Margin = new Padding(0, 0, 8, 0),
             FillColor = key == _activeFilter ? Theme.Accent : ColorTranslator.FromHtml("#1a1a1a"),
             ForeColor = key == _activeFilter ? Color.White : Theme.TextSecondary,
@@ -350,7 +354,7 @@ internal sealed class HistoryPage : UserControl
         };
         var detailLabel = new Label
         {
-            Text = item.Detail,
+            Text = LocalizeDetail(item.Detail),
             Font = new Font("Segoe UI", 7.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = false,

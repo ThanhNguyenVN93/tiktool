@@ -74,7 +74,7 @@ internal sealed class GuidePage : UserControl
         };
 
         flow.Controls.Add(BuildSection("📥", T("Tab Download", "Download Tab"),
-            T("Cách tải video TikTok & Instagram Reels", "How to download TikTok & Instagram Reels"),
+            T("Cách tải video TikTok && Instagram Reels", "How to download TikTok && Instagram Reels"),
             new[]
             {
                 T("1. Dán URL video vào ô nhập liệu phía trên (hỗ trợ nhiều URL, mỗi dòng 1 link).",
