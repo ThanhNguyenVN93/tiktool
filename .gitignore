@@ -23,3 +23,6 @@ TikTool/Resources/*.exe
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# Visual Studio designer scaffolding: the UI is built in code, so the Designer only creates empty resx files
+TikTool/Forms/*.resx

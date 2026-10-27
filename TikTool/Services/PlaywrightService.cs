@@ -785,7 +785,7 @@ public sealed class PlaywrightService : IAsyncDisposable
     /// (the canonical user-record fingerprint) and records them into <paramref name="result"/>.
     /// Never throws — a parse failure for one response must not interrupt the list-loading loop.
     /// </summary>
-    private static void ExtractUserDataFromApiResponse(
+    internal static void ExtractUserDataFromApiResponse(
         string json,
         ConcurrentDictionary<string, (string UserId, int VideoCount, int Relation)> result)
     {
@@ -1362,7 +1362,7 @@ public sealed class PlaywrightService : IAsyncDisposable
 
     /// <summary>Newest createTime across a page of posts. The first item can be a PINNED post, which is old by
     /// design, so the latest post is the maximum over the page, not the first element.</summary>
-    private static long? NewestCreateTime(JsonElement itemList)
+    internal static long? NewestCreateTime(JsonElement itemList)
     {
         long? newest = null;
         foreach (var item in itemList.EnumerateArray())
