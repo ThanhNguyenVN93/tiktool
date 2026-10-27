@@ -27,6 +27,10 @@ internal sealed class SettingsPage : UserControl
     private Guna2ToggleSwitch _skipFriendsToggle = null!;
     private Guna2ToggleSwitch _notifyRateLimitToggle = null!;
 
+    private Guna2ToggleSwitch _autoWaitRateLimitToggle = null!;
+    private NumericUpDown _rateLimitWaitNumeric = null!;
+    private NumericUpDown _maxUnfollowsPerDayNumeric = null!;
+
     private Guna2ToggleSwitch _startWithWindowsToggle = null!;
     private Guna2ToggleSwitch _minimizeToTrayToggle = null!;
 
@@ -229,14 +233,24 @@ internal sealed class SettingsPage : UserControl
         _preferApiToggle = BuildToggle();
         _skipFriendsToggle = BuildToggle();
         _notifyRateLimitToggle = BuildToggle();
+        _autoWaitRateLimitToggle = BuildToggle();
+        _rateLimitWaitNumeric = BuildNumeric(10, 600);
+        _maxUnfollowsPerDayNumeric = BuildNumeric(1, 1000);
+
+        var waitControl = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false };
+        waitControl.Controls.Add(_rateLimitWaitNumeric);
+        waitControl.Controls.Add(new Label { Text = "giây", ForeColor = Theme.TextMuted, AutoSize = true, Margin = new Padding(4, 6, 0, 0) });
 
         return new List<Control>
         {
             BuildRow("⏱", T("Delay giữa mỗi lượt bỏ theo dõi","Delay between unfollows"), T("Chờ ngẫu nhiên trong khoảng này để tránh bị TikTok khoá","Random wait to avoid TikTok rate-limiting"), delayControl),
             BuildRow("🔢", T("Giới hạn mỗi phiên","Session limit"), T("Số tài khoản tối đa bỏ theo dõi trong 1 lần bấm Bắt đầu","Max accounts to unfollow per Start click"), _sessionLimitNumeric),
+            BuildRow("📅", T("Giới hạn mỗi ngày","Daily limit"), T("Tổng số unfollow tối đa trong 1 ngày — để bảo vệ tài khoản","Max total unfollows per day — to protect your account"), _maxUnfollowsPerDayNumeric),
             BuildRow("🌐", T("Ưu tiên API trước Playwright","Prefer API over browser"), T("Nhanh hơn; tự fallback sang trình duyệt khi API lỗi","Faster; auto-falls back to browser on API error"), _preferApiToggle),
             BuildRow("🤝", T("Bỏ qua bạn bè (follow qua lại)","Skip mutual follows"), T("Không unfollow tài khoản đang follow lại mình","Don't unfollow accounts who follow you back"), _skipFriendsToggle),
-            BuildRow("🔔", T("Cảnh báo khi bị rate limit","Notify on rate limit"), T("Hiện hộp thoại hỏi tiếp tục hay dừng khi TikTok chặn","Show dialog asking to continue or stop when TikTok blocks"), _notifyRateLimitToggle),
+            BuildRow("⚡", T("Tự động đợi khi bị rate limit","Auto-wait on rate limit"), T("Đợi rồi tiếp tục thay vì hiện hộp thoại hỏi","Wait and retry instead of showing a dialog"), _autoWaitRateLimitToggle),
+            BuildRow("⏳", T("Thời gian đợi rate limit","Rate limit wait time"), T("Số giây tự động đợi khi TikTok giới hạn tần suất","Seconds to auto-wait when TikTok rate-limits"), waitControl),
+            BuildRow("🔔", T("Cảnh báo khi bị rate limit","Notify on rate limit"), T("Hiện hộp thoại hỏi (chỉ dùng khi tắt tự động đợi)","Show dialog (only used when Auto-wait is off)"), _notifyRateLimitToggle),
         };
     }
 
@@ -368,8 +382,11 @@ internal sealed class SettingsPage : UserControl
         _delayMinNumeric.Value = Math.Clamp(s.UnfollowDelayMinMs, (int)_delayMinNumeric.Minimum, (int)_delayMinNumeric.Maximum);
         _delayMaxNumeric.Value = Math.Clamp(s.UnfollowDelayMaxMs, (int)_delayMaxNumeric.Minimum, (int)_delayMaxNumeric.Maximum);
         _sessionLimitNumeric.Value = Math.Clamp(s.UnfollowSessionLimit, (int)_sessionLimitNumeric.Minimum, (int)_sessionLimitNumeric.Maximum);
+        _maxUnfollowsPerDayNumeric.Value = Math.Clamp(s.MaxUnfollowsPerDay, (int)_maxUnfollowsPerDayNumeric.Minimum, (int)_maxUnfollowsPerDayNumeric.Maximum);
         _preferApiToggle.Checked = s.PreferApiOverPlaywright;
         _skipFriendsToggle.Checked = s.SkipFriends;
+        _autoWaitRateLimitToggle.Checked = s.AutoWaitOnRateLimit;
+        _rateLimitWaitNumeric.Value = Math.Clamp(s.RateLimitWaitSeconds, (int)_rateLimitWaitNumeric.Minimum, (int)_rateLimitWaitNumeric.Maximum);
         _notifyRateLimitToggle.Checked = s.NotifyOnRateLimit;
 
         _startWithWindowsToggle.Checked = s.StartWithWindows;
@@ -397,8 +414,11 @@ internal sealed class SettingsPage : UserControl
         s.UnfollowDelayMinMs = min;
         s.UnfollowDelayMaxMs = max;
         s.UnfollowSessionLimit = (int)_sessionLimitNumeric.Value;
+        s.MaxUnfollowsPerDay = (int)_maxUnfollowsPerDayNumeric.Value;
         s.PreferApiOverPlaywright = _preferApiToggle.Checked;
         s.SkipFriends = _skipFriendsToggle.Checked;
+        s.AutoWaitOnRateLimit = _autoWaitRateLimitToggle.Checked;
+        s.RateLimitWaitSeconds = (int)_rateLimitWaitNumeric.Value;
         s.NotifyOnRateLimit = _notifyRateLimitToggle.Checked;
 
         s.StartWithWindows = _startWithWindowsToggle.Checked;

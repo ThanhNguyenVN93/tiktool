@@ -1,3 +1,5 @@
+using TikTool.Services;
+
 namespace TikTool.Forms;
 
 public enum LogLevel
@@ -39,6 +41,8 @@ public sealed class LogPanel : Panel
         {
             return;
         }
+
+        AppLog.Write(level.ToString().ToUpperInvariant(), text);
 
         void Append()
         {

@@ -150,6 +150,7 @@ internal sealed class HistoryPage : UserControl
         };
 
         row.Controls.Add(BuildFilterChip("all", T("Tất cả","All")));
+        row.Controls.Add(BuildFilterChip("unfollow", T("Đã Unfollow","Unfollowed")));
         row.Controls.Add(BuildFilterChip("today", T("Hôm nay","Today")));
         row.Controls.Add(BuildFilterChip("week", T("Tuần này","This week")));
         row.Controls.Add(BuildFilterChip("month", T("Tháng này","This month")));
@@ -236,12 +237,25 @@ internal sealed class HistoryPage : UserControl
         };
         btnExport.Click += (_, _) => ExportCsv();
 
+        var btnExportUnfollow = new Guna2Button
+        {
+            Text = T("↩ DS Unfollow","↩ Unfollow List"),
+            Font = Theme.FontMedium,
+            Size = new Size(130, 32),
+            Location = new Point(420, 12),
+            FillColor = ColorTranslator.FromHtml("#1a1a1a"),
+            ForeColor = Theme.TextSecondary,
+            BorderRadius = 7,
+            Cursor = Cursors.Hand,
+        };
+        btnExportUnfollow.Click += (_, _) => ExportUnfollowCsv();
+
         var btnClear = new Guna2Button
         {
             Text = T("Xóa lịch sử","Clear history"),
             Font = Theme.FontMedium,
             Size = new Size(110, 32),
-            Location = new Point(450, 12),
+            Location = new Point(300, 12),
             FillColor = ColorTranslator.FromHtml("#1a1a1a"),
             ForeColor = ColorTranslator.FromHtml("#f87171"),
             BorderRadius = 7,
@@ -250,6 +264,7 @@ internal sealed class HistoryPage : UserControl
         btnClear.Click += async (_, _) => await ClearHistoryAsync();
 
         bar.Controls.Add(btnClear);
+        bar.Controls.Add(btnExportUnfollow);
         bar.Controls.Add(btnExport);
         bar.Controls.Add(sep);
         return bar;
@@ -266,6 +281,7 @@ internal sealed class HistoryPage : UserControl
             _listFlow.Controls.Add(BuildHistoryRow(item));
         }
 
+
         _listFlow.ResumeLayout(true);
         _emptyLabel.Visible = items.Count == 0;
 
@@ -277,6 +293,7 @@ internal sealed class HistoryPage : UserControl
         var now = DateTime.Now;
         return _activeFilter switch
         {
+            "unfollow" => all.Where(i => i.Type == "Unfollow").ToList(),
             "today" => all.Where(i => i.Timestamp.Date == now.Date).ToList(),
             "week" => all.Where(i => i.Timestamp >= now.AddDays(-7)).ToList(),
             "month" => all.Where(i => i.Timestamp >= now.AddMonths(-1)).ToList(),
@@ -294,8 +311,9 @@ internal sealed class HistoryPage : UserControl
         _statSize.Text = $"{totalBytes / 1024.0 / 1024.0 / 1024.0:0.00} GB";
     }
 
-    private static Control BuildHistoryRow(HistoryItem item)
+    private Control BuildHistoryRow(HistoryItem item)
     {
+        var isUnfollow = item.Type == "Unfollow" && item.Success;
         var row = new Guna2Panel
         {
             Width = ContentWidth,
@@ -310,13 +328,16 @@ internal sealed class HistoryPage : UserControl
         var icon = item.Type == "Download" ? "🎬" : "🚫";
         var iconLabel = new Label { Text = icon, Font = new Font("Segoe UI Emoji", 12f), Size = new Size(28, 28), Location = new Point(10, 10), TextAlign = ContentAlignment.MiddleCenter, BackColor = Theme.Panel };
 
+        // Unfollow rows with a "Follow lại" button need less width for title
+        var titleWidth = isUnfollow ? ContentWidth - 370 : ContentWidth - 320;
+
         var titleLabel = new Label
         {
             Text = item.Title,
             Font = new Font("Segoe UI", 9f, FontStyle.Bold),
             ForeColor = Theme.TextPrimary,
             AutoSize = false,
-            Size = new Size(ContentWidth - 320, 18),
+            Size = new Size(titleWidth, 18),
             Location = new Point(46, 6),
             AutoEllipsis = true,
             BackColor = Theme.Panel,
@@ -327,7 +348,7 @@ internal sealed class HistoryPage : UserControl
             Font = new Font("Segoe UI", 7.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = false,
-            Size = new Size(ContentWidth - 320, 16),
+            Size = new Size(titleWidth, 16),
             Location = new Point(46, 24),
             AutoEllipsis = true,
             BackColor = Theme.Panel,
@@ -339,8 +360,8 @@ internal sealed class HistoryPage : UserControl
             Font = new Font("Segoe UI", 7.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = false,
-            Size = new Size(110, 16),
-            Location = new Point(ContentWidth - 220, 16),
+            Size = new Size(90, 16),
+            Location = new Point(ContentWidth - 180, 16),
             TextAlign = ContentAlignment.MiddleRight,
             BackColor = Theme.Panel,
         };
@@ -361,6 +382,33 @@ internal sealed class HistoryPage : UserControl
         row.Controls.Add(detailLabel);
         row.Controls.Add(timeLabel);
         row.Controls.Add(statusLabel);
+
+        if (isUnfollow)
+        {
+            // Title là "@username" — bỏ "@" để lấy username
+            var username = item.Title.TrimStart('@');
+            var btnRefollow = new Guna2Button
+            {
+                Text = T("↩ Follow lại", "↩ Re-follow"),
+                Font = Theme.FontLabel,
+                Size = new Size(82, 26),
+                Location = new Point(ContentWidth - 270, 11),
+                FillColor = ColorTranslator.FromHtml("#1a1a1a"),
+                ForeColor = Theme.TextSecondary,
+                BorderRadius = 6,
+                Cursor = Cursors.Hand,
+            };
+            btnRefollow.Click += (_, _) =>
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = $"https://www.tiktok.com/@{username}",
+                    UseShellExecute = true,
+                });
+            };
+            row.Controls.Add(btnRefollow);
+        }
+
         return row;
     }
 
@@ -388,12 +436,38 @@ internal sealed class HistoryPage : UserControl
             Filter = "CSV (*.csv)|*.csv",
             FileName = $"tiktool-history-{DateTime.Now:yyyyMMdd-HHmmss}.csv",
         };
-        if (dialog.ShowDialog() != DialogResult.OK)
-        {
-            return;
-        }
+        if (dialog.ShowDialog() != DialogResult.OK) return;
 
         File.WriteAllText(dialog.FileName, _historyService.ExportCsv());
         MessageBox.Show($"Đã xuất {dialog.FileName}", "TikTool", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
+
+    private void ExportUnfollowCsv()
+    {
+        using var dialog = new SaveFileDialog
+        {
+            Filter = "CSV (*.csv)|*.csv",
+            FileName = $"tiktool-unfollow-{DateTime.Now:yyyyMMdd-HHmmss}.csv",
+            Title = T("Xuất danh sách kênh đã unfollow", "Export unfollowed channels list"),
+        };
+        if (dialog.ShowDialog() != DialogResult.OK) return;
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("Username,Detail,Timestamp");
+        foreach (var item in _historyService.Items.Where(i => i.Type == "Unfollow" && i.Success))
+        {
+            var username = item.Title.TrimStart('@');
+            sb.AppendLine($"@{username},{CsvEscape(item.Detail)},{item.Timestamp:yyyy-MM-dd HH:mm:ss}");
+        }
+
+        File.WriteAllText(dialog.FileName, sb.ToString());
+        MessageBox.Show(T($"Đã xuất danh sách unfollow → {dialog.FileName}\nMở trang TikTok của từng kênh để follow lại.",
+                          $"Exported unfollow list → {dialog.FileName}\nOpen each channel's TikTok page to re-follow."),
+                        "TikTool", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private static string CsvEscape(string value) =>
+        value.Contains(',') || value.Contains('"') ? $"\"{value.Replace("\"", "\"\"")}\"" : value;
+
+    private static string T(string vi, string _en) => vi;
 }

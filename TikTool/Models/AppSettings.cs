@@ -19,6 +19,11 @@ public class AppSettings
     public bool SkipFriends { get; set; } = true;
     public bool NotifyOnRateLimit { get; set; } = true;
 
+    // Rate limit & daily quota
+    public bool AutoWaitOnRateLimit { get; set; } = true;
+    public int RateLimitWaitSeconds { get; set; } = 90;
+    public int MaxUnfollowsPerDay { get; set; } = 100;
+
     // App
     public bool StartWithWindows { get; set; }
     public bool MinimizeToTray { get; set; }

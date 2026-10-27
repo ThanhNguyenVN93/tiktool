@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text.Json;
@@ -35,28 +36,35 @@ public sealed class PlaywrightService : IAsyncDisposable
     {
         TryFlushDnsCache();
 
-        var chromePath = FindRealChromeExecutable()
-            ?? throw new InvalidOperationException(
-                "Không tìm thấy Google Chrome thật đã cài trên máy (đã kiểm tra Program Files, Program Files (x86), và AppData\\Local\\Google\\Chrome).");
-
-        var port = GetFreeTcpPort();
-        _profileDir = Path.Combine(Path.GetTempPath(), $"tiktool_chrome_session_{Guid.NewGuid():N}");
-        Directory.CreateDirectory(_profileDir);
-
-        // headless=new is Chrome's own modern headless mode (much closer to a real render than
-        // the old one) — left off by default since visible-window is the only configuration
-        // confirmed to work against TikTok so far; flip to true once headless is verified safe.
-        var headlessArg = headless ? "--headless=new " : "";
-        _chromeProcess = Process.Start(new ProcessStartInfo
-        {
-            FileName = chromePath,
-            Arguments = $"{headlessArg}--remote-debugging-port={port} --user-data-dir=\"{_profileDir}\" --no-first-run --no-default-browser-check about:blank",
-            UseShellExecute = false,
-        }) ?? throw new InvalidOperationException("Không khởi chạy được Chrome thật.");
-
+        var chromePath = FindRealChromeExecutable();
         _playwright = await Playwright.CreateAsync();
-        _browser = await ConnectWithRetryAsync(_playwright, port, CancellationToken.None);
-        _context = _browser.Contexts.FirstOrDefault() ?? await _browser.NewContextAsync();
+
+        if (chromePath is not null)
+        {
+            // CDP-attach to real Chrome/Edge — the only mode confirmed to work against TikTok.
+            var port = GetFreeTcpPort();
+            _profileDir = Path.Combine(Path.GetTempPath(), $"tiktool_chrome_session_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(_profileDir);
+
+            var headlessArg = headless ? "--headless=new " : "";
+            _chromeProcess = Process.Start(new ProcessStartInfo
+            {
+                FileName = chromePath,
+                Arguments = $"{headlessArg}--remote-debugging-port={port} --user-data-dir=\"{_profileDir}\" --no-first-run --no-default-browser-check --window-size=1440,900 about:blank",
+                UseShellExecute = false,
+            }) ?? throw new InvalidOperationException("Không khởi chạy được Chrome/Edge.");
+
+            _browser = await ConnectWithRetryAsync(_playwright, port, CancellationToken.None);
+            _context = _browser.Contexts.FirstOrDefault() ?? await _browser.NewContextAsync();
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                "Không tìm thấy Google Chrome hoặc Microsoft Edge trên máy.\n" +
+                "TikTool cần attach vào Chrome/Edge thật (TikTok chặn trình duyệt tự động).\n" +
+                "Hãy cài Google Chrome: https://www.google.com/chrome/");
+        }
+
         await _context.AddCookiesAsync(BuildCookies(cookie));
         _page = _context.Pages.FirstOrDefault() ?? await _context.NewPageAsync();
 
@@ -67,8 +75,13 @@ public sealed class PlaywrightService : IAsyncDisposable
         // effort — a failure here shouldn't block the actual task.
         try
         {
-            await _page.GotoAsync("https://www.tiktok.com/", new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 15_000 });
-            await Task.Delay(800);
+            try
+            {
+                await _page.GotoAsync("https://www.tiktok.com/",
+                    new PageGotoOptions { WaitUntil = WaitUntilState.NetworkIdle, Timeout = 15_000 });
+            }
+            catch { /* NetworkIdle timeout on TikTok is expected — page content already loaded */ }
+            await Task.Delay(2500);
         }
         catch
         {
@@ -103,16 +116,92 @@ public sealed class PlaywrightService : IAsyncDisposable
         }
     }
 
-    private static readonly string[] RealChromeCandidates =
+    private const string ChromeOfflineInstallerUrl =
+        "https://dl.google.com/chrome/install/ChromeStandaloneSetup64.exe";
+
+    /// <summary>If Chrome/Edge is already installed this is a no-op and returns immediately.
+    /// Otherwise shows a MessageBox asking the user for consent, downloads the Chrome offline
+    /// installer (~80 MB), runs it silently (per-user, no admin needed), then verifies that
+    /// Chrome is now findable. Progress bytes are reported via <paramref name="progress"/> so
+    /// the caller can update a UI label/bar. Throws on download or install failure with a
+    /// friendly Vietnamese message.</summary>
+    public static async Task EnsureChromeInstalledAsync(
+        IProgress<(long Downloaded, long Total)>? progress = null,
+        CancellationToken ct = default)
     {
+        if (FindRealChromeExecutable() is not null) return;
+
+        var answer = MessageBox.Show(
+            "Không tìm thấy Google Chrome hoặc Microsoft Edge trên máy.\n\n" +
+            "TikTool cần attach vào Chrome thật vì TikTok chặn trình duyệt tự động.\n\n" +
+            "Cài Google Chrome tự động? (~80 MB)",
+            "Cần Chrome để dùng tính năng Unfollow",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+
+        if (answer != DialogResult.Yes)
+            throw new OperationCanceledException("Người dùng huỷ cài Chrome.");
+
+        var setupPath = Path.Combine(Path.GetTempPath(), "tiktool_chrome_setup.exe");
+
+        using var http = new System.Net.Http.HttpClient();
+        http.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0");
+
+        using var response = await http.GetAsync(
+            ChromeOfflineInstallerUrl,
+            System.Net.Http.HttpCompletionOption.ResponseHeadersRead,
+            ct);
+        response.EnsureSuccessStatusCode();
+
+        var total = response.Content.Headers.ContentLength ?? -1L;
+        await using var src = await response.Content.ReadAsStreamAsync(ct);
+        await using var dst = File.Create(setupPath);
+
+        var buffer = new byte[81920];
+        long downloaded = 0;
+        int read;
+        while ((read = await src.ReadAsync(buffer, ct)) > 0)
+        {
+            await dst.WriteAsync(buffer.AsMemory(0, read), ct);
+            downloaded += read;
+            progress?.Report((downloaded, total));
+        }
+
+        await dst.FlushAsync(ct);
+        dst.Close();
+
+        using var install = Process.Start(new ProcessStartInfo
+        {
+            FileName = setupPath,
+            Arguments = "/silent /install",
+            UseShellExecute = false,
+        }) ?? throw new InvalidOperationException("Không khởi chạy được Chrome installer.");
+
+        // Installer typically finishes in under 2 minutes on a normal machine.
+        await Task.Run(() => install.WaitForExit(120_000), ct);
+
+        try { File.Delete(setupPath); } catch { }
+
+        if (FindRealChromeExecutable() is null)
+            throw new InvalidOperationException(
+                "Cài Chrome xong nhưng vẫn không tìm thấy — thử khởi động lại máy hoặc cài thủ công: " +
+                "https://www.google.com/chrome/");
+    }
+
+    private static readonly string[] RealBrowserCandidates =
+    {
+        // Chrome — per-machine, per-machine x86, per-user
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Google", "Chrome", "Application", "chrome.exe"),
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Google", "Chrome", "Application", "chrome.exe"),
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Google", "Chrome", "Application", "chrome.exe"),
+        // Edge — per-machine, per-machine x86, per-user
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Microsoft", "Edge", "Application", "msedge.exe"),
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Microsoft", "Edge", "Application", "msedge.exe"),
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "Edge", "Application", "msedge.exe"),
     };
 
-    /// <summary>Finds the real, installed Google Chrome executable (not Playwright's bundled
-    /// Chromium). Checks the usual per-machine and per-user install locations.</summary>
-    public static string? FindRealChromeExecutable() => RealChromeCandidates.FirstOrDefault(File.Exists);
+    /// <summary>Finds Chrome or Edge (Chrome first). Returns null if neither is installed.</summary>
+    public static string? FindRealChromeExecutable() => RealBrowserCandidates.FirstOrDefault(File.Exists);
 
     /// <summary>Opens a VISIBLE window of the user's REAL, installed Chrome (not Playwright's
     /// bundled Chromium — TikTok's QR-code login refuses to render at all in that bundled
@@ -128,8 +217,8 @@ public sealed class PlaywrightService : IAsyncDisposable
     {
         var chromePath = FindRealChromeExecutable()
             ?? throw new InvalidOperationException(
-                "Không tìm thấy Google Chrome thật đã cài trên máy (đã kiểm tra Program Files, Program Files (x86), và AppData\\Local\\Google\\Chrome). " +
-                "Nếu Chrome cài ở vị trí khác, hãy dùng cách 'Dán cookie thủ công' thay thế.");
+                "Không tìm thấy Google Chrome hoặc Microsoft Edge trên máy. " +
+                "Hãy cài Chrome/Edge hoặc dùng cách 'Dán cookie thủ công' thay thế.");
 
         var port = GetFreeTcpPort();
         var profileDir = Path.Combine(Path.GetTempPath(), $"tiktool_chrome_login_{Guid.NewGuid():N}");
@@ -258,13 +347,12 @@ public sealed class PlaywrightService : IAsyncDisposable
         }
     }
 
-    /// <summary>Loads the current user's full following list via the "Following accounts" panel
-    /// on tiktok.com/following (opened through its "View all" link) — NOT the modal opened from
-    /// the profile page's follow-count stat, which is confirmed (live, 2026-09-13) to silently
-    /// cap out after its first ~30 rows on TikTok's web for large lists (reproduced even with a
-    /// human manually scrolling that modal in an ordinary browser — a real TikTok bug, not
-    /// anything fixable client-side). See SelectorsConfig.FollowingItem for the full story and
-    /// why this different panel doesn't have that problem.</summary>
+    /// <summary>Loads the current user's full following list by clicking the "Following" count
+    /// on their own profile page — this opens a modal with all following accounts in a properly
+    /// scrollable container. The API response interceptor captures userId/videoCount from TikTok's
+    /// own XHR calls passively. The old "following-see-all" sidebar panel was dropped (2026-10-26):
+    /// it pre-loads exactly 5 accounts whose container height equals its content height, so no
+    /// overflow ever exists and scrolling triggers no further API calls.</summary>
     public async Task<List<FollowingAccount>> LoadFollowingListAsync(
         SelectorsConfig selectors, string username, IProgress<string>? log = null, CancellationToken ct = default)
     {
@@ -274,164 +362,243 @@ public sealed class PlaywrightService : IAsyncDisposable
         var accounts = new List<FollowingAccount>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // Best-effort: the real total ("528" etc.), read off the profile page, so the caller can
-        // tell the user if this run came up short — not load-bearing for the scrape itself.
+        // The real total (e.g. 547) comes from the list API's own 'total' field, captured below -- so no
+        // separate visit to the profile page is needed (and that page is the one TikTok blocks first).
         int? totalFollowing = null;
-        try
+
+        // Intercept TikTok's own API responses while scrolling the following panel — TikTok's own
+        // XHR calls carry valid signatures and return richer data (userId, videoCount, secUid) that
+        // we cannot easily obtain by issuing our own requests. Capturing these passively (no extra
+        // network cost) populates UserId and VideoCount for each account without separate profile
+        // visits, which both avoids rate-limiting and handles deleted accounts (Access Denied on
+        // their profile page) since we have their userId from the list load instead.
+        var capturedUsers = new ConcurrentDictionary<string, (string UserId, int VideoCount, int Relation)>(StringComparer.OrdinalIgnoreCase);
+
+        // Diagnostics: last paged-list response seen per API path (hasMore/cursor/size), so a stall
+        // can be attributed to TikTok ending pagination vs. the scraper not reaching the bottom.
+        var batchInfo = new ConcurrentDictionary<string, string>();
+        var batchCounts = new ConcurrentDictionary<string, int>();
+        var lastScrollInfo = "?";
+
+        async void OnApiResponse(object? _, IResponse resp)
         {
-            var profileUrl = selectors.ProfilePageUrl.Replace("{username}", Uri.EscapeDataString(username));
-            await page.GotoAsync(profileUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
-            var totalText = await page.Locator("[data-e2e='following-count']").First.InnerTextAsync(new LocatorInnerTextOptions { Timeout = 5000 });
-            if (int.TryParse(totalText.Trim(), out var parsed))
+            if (!resp.Ok) return;
+            var urlPath = resp.Url.Split('?')[0];
+            if (!urlPath.Contains("/api/")) return;
+            try
             {
-                totalFollowing = parsed;
+                var body = await resp.TextAsync();
+                ExtractUserDataFromApiResponse(body, capturedUsers);
+                RecordListBatch(body, urlPath, batchInfo, batchCounts);
+
+                if (totalFollowing is null && urlPath.EndsWith("/api/user/list/", StringComparison.Ordinal))
+                {
+                    using var totalDoc = JsonDocument.Parse(body);
+                    if (totalDoc.RootElement.TryGetProperty("total", out var totalEl) && totalEl.ValueKind == JsonValueKind.Number)
+                    {
+                        totalFollowing = totalEl.GetInt32();
+                    }
+                }
             }
-        }
-        catch
-        {
-            // best effort — not knowing the total just means the "loaded fewer than total"
-            // warning below can't fire, everything else still works
+            catch { /* response body may be unavailable on navigation — safe to ignore */ }
         }
 
-        // The "Following" stat/modal on the profile page is confirmed (2026-09-13, live — see
-        // class doc comment above) to stop loading past its first batch. The "Following accounts"
-        // panel reachable from tiktok.com/following's left sidebar ("View all") is a DIFFERENT UI
-        // surface for the exact same data and does NOT have that problem — confirmed live by the
-        // account owner manually scrolling it all the way through. So that's the one this scrapes.
-        // A single navigation with a generous wait — not several short retries — because the
-        // failure mode confirmed live 2026-09-13 was the "Following accounts" sidebar widget
-        // still showing its loading skeleton at the 10s mark, not a dead end that re-navigating
-        // would fix; re-navigating repeatedly just restarts that same slow hydration each time.
+        page.Response += OnApiResponse;
+
+        // Open the full "Following accounts" panel: tiktok.com/following -> sidebar "View all". It is
+        // reached directly, never via the profile page: the profile modal is capped by TikTok at ~60
+        // rows (reproduced by hand), and the profile page is the first thing TikTok blocks/errors on
+        // (its video grid shows "Something went wrong" even when the rest of the site works).
         var opened = false;
-        for (var attempt = 0; attempt < 2 && !opened; attempt++)
+        for (var attempt = 0; attempt < 3 && !opened; attempt++)
         {
             try
             {
-                await page.GotoAsync("https://www.tiktok.com/following", new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
-
-                if (await IsTikTokErrorPageAsync(page))
-                {
-                    log?.Report("[Unfollow] TikTok trả về trang lỗi tạm thời — đang thử tải lại...");
-                    await Task.Delay(2000, ct);
-                    continue;
-                }
-
-                // "View all" also appears under other sidebar sections (e.g. suggested accounts),
-                // but "Following accounts" is the first such section on the page, so .First is the
-                // right one — verified against a live DOM dump 2026-09-13.
-                var viewAll = page.GetByText("View all", new PageGetByTextOptions { Exact = true }).First;
-                await viewAll.WaitForAsync(new LocatorWaitForOptions { Timeout = 25_000 });
-                await viewAll.ClickAsync();
+                await OpenFollowingPanelAsync(page, selectors.FollowingItem, username, ct);
                 opened = true;
             }
-            catch (Exception) when (ct.IsCancellationRequested == false)
+            catch (Exception ex) when (ct.IsCancellationRequested == false)
             {
-                if (attempt < 1)
+                AppLog.Write("WARN", $"Open Following panel attempt {attempt + 1} failed: {ex.GetType().Name}: {ex.Message}");
+                if (attempt < 2)
                 {
-                    await Task.Delay(1000, ct);
+                    log?.Report(T($"[Unfollow] Chưa mở được danh sách Following ({ex.Message}), thử lại (lần {attempt + 2})...",
+                                  $"[Unfollow] Following list not opened ({ex.Message}), retrying (attempt {attempt + 2})..."));
+                    await Task.Delay(4000, ct);
                 }
             }
         }
-
         if (!opened)
         {
-            var dumpPath = await TryDumpDebugStateAsync(page, "view-all-not-found");
+            var dumpPath = await TryDumpDebugStateAsync(page, "following-modal-not-found");
             var dumpNote = dumpPath is not null ? $" Đã lưu ảnh chụp + HTML để chẩn đoán: {dumpPath}" : "";
             throw new InvalidOperationException(
-                "Không tìm thấy nút 'View all' của panel 'Following accounts' trên tiktok.com/following sau nhiều lần thử — TikTok có thể đã đổi DOM (cần cập nhật selectors.json) hoặc liên tục chặn phiên này." + dumpNote);
+                T("Không thể mở danh sách Following sau 3 lần thử — TikTok chặn hoặc đổi DOM. Thử lại sau vài phút hoặc dùng VPN." + dumpNote,
+                  "Could not open the Following list after 3 attempts — TikTok blocked or changed DOM. Retry after a few minutes or use a VPN." + dumpNote));
         }
 
-        var itemsLocator = page.Locator(selectors.FollowingItem);
+        var modalMissingTicks = 0;
 
-        // The panel opens instantly but its first batch of items arrives from a follow-up API
-        // call — waiting for at least one row (rather than a fixed delay) avoids concluding "0 tài
-        // khoản" if that call is slow, while not wasting time when it's fast.
-        try
-        {
-            await itemsLocator.First.WaitForAsync(new LocatorWaitForOptions { Timeout = 10_000 });
-        }
-        catch (Exception) when (ct.IsCancellationRequested == false)
-        {
-            // Genuinely empty following list (0 kênh) also lands here — let the loop below run
-            // its normal 3-strikes-no-change check and return an empty list rather than throwing.
-        }
-
-        var prevCount = 0;
+        // Track unique accounts seen, not raw DOM count. TikTok's modal is a virtual list: it
+        // removes items from the top of the DOM as new batches load at the bottom. Tracking DOM
+        // count would cause stall false-positives (count stays ~20 while items shift). Instead we
+        // loop from 0 every tick (seen HashSet deduplicates) and measure progress by seen.Count.
+        var prevSeenCount = 0;
         var noChangeCount = 0;
+        var innerRetryCount = 0;
+        const int noChangeRetryThreshold = 20; // 20s stuck → try reopening the panel
+        const int maxInnerRetries = 2;          // at most 2 panel-reopen attempts per load
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
 
         // Confirmed live 2026-09-13: with the multi-tick wheel scroll below, this panel DOES keep
         // loading more (seen progressing 30 -> 55 in one run) — it's just inconsistent about how
         // much patience each batch needs, sometimes stalling harder than others. So this is
-        // deliberately very patient (20 no-change strikes, not a handful) and bounded by wall-clock
-        // time instead (5 minutes) rather than a small fixed strike count — the failure mode to
-        // avoid here is quitting too early on a list that would've kept growing, not spending an
-        // extra minute confirming it's actually done.
+        // deliberately very patient (35 no-change strikes before giving up) and bounded by wall-clock
+        // time (5 minutes). If scroll is stuck for 20s with no progress AND we've used fewer than
+        // maxInnerRetries, we navigate back to home and reopen the panel — TikTok often serves a
+        // fresh API batch on a second open, whereas the same panel just kept returning 5 accounts
+        // even after 60+ seconds of scrolling in the original session.
         var overallBudget = TimeSpan.FromMinutes(5);
         while (noChangeCount < 35 && stopwatch.Elapsed < overallBudget)
         {
             ct.ThrowIfCancellationRequested();
 
-            var count = await itemsLocator.CountAsync();
-            for (var i = prevCount; i < count; i++)
+            var scan = await ScanFollowingModalAsync(page, username, selectors.FollowingItem);
+            var count = scan.Rows.Count;
+            foreach (var (rowUser, rowNick) in scan.Rows)
             {
-                var acc = await ParseFollowingItemAsync(itemsLocator.Nth(i));
-                if (acc is not null && seen.Add(acc.Username))
+                if (seen.Add(rowUser))
                 {
-                    accounts.Add(acc);
+                    accounts.Add(new FollowingAccount { Username = rowUser, Nickname = rowNick });
                 }
             }
 
-            if (count == prevCount)
+            if (!scan.Found && ++modalMissingTicks == 3)
+            {
+                var missPath = await TryDumpDebugStateAsync(page, "following-modal-root-missing");
+                log?.Report($"[Unfollow] Không xác định được modal Following (đã lưu chẩn đoán: {missPath}).");
+            }
+
+            if (seen.Count == prevSeenCount)
             {
                 noChangeCount++;
-                // Heartbeat so a long stall (this can now run up to 5 minutes) reads as "still
-                // working" in the log rather than going silent and looking hung.
-                log?.Report($"[Unfollow] Đang chờ tải thêm... ({count} tài khoản, {stopwatch.Elapsed:mm\\:ss} trôi qua)");
+
+                // Auto-retry: if stuck for noChangeRetryThreshold seconds, close and reopen the
+                // panel so TikTok issues a fresh API call. The seen HashSet deduplicates any
+                // overlap with accounts already collected.
+                // Skip the retry when we're already at or very near the known total — being
+                // "stuck" at 524/524 just means the panel ran out of items, not a mid-scroll stall.
+                var nearTotal = totalFollowing is int tot && accounts.Count >= (int)(tot * 0.92);
+
+                // Already at/near the real total and nothing new for 5 ticks: the list is exhausted (the
+                // profile count also includes deleted/banned accounts that are never returned), so stop
+                // instead of waiting out the full 35-tick stall budget.
+                if (nearTotal && noChangeCount >= 5)
+                {
+                    log?.Report($"[Unfollow] Đã tải {accounts.Count}/{totalFollowing} kênh — danh sách đã hết, dừng.");
+                    break;
+                }
+                if (noChangeCount >= noChangeRetryThreshold && innerRetryCount < maxInnerRetries && !nearTotal)
+                {
+                    innerRetryCount++;
+                    noChangeCount = 0;
+                    log?.Report(
+                        $"[Unfollow] Kẹt {noChangeRetryThreshold}s tại {accounts.Count} tài khoản — " +
+                        $"đang mở lại panel (lần {innerRetryCount}/{maxInnerRetries})...");
+
+                    try
+                    {
+                        // Reopen the modal: navigate back to profile, then click the stat again.
+                        await OpenFollowingPanelAsync(page, selectors.FollowingItem, username, ct);
+                        log?.Report(T("[Unfollow] Modal Following đã mở lại thành công — tiếp tục tải...",
+                                      "[Unfollow] Following modal reopened successfully — continuing..."));
+                    }
+                    catch (Exception retryEx) when (!ct.IsCancellationRequested)
+                    {
+                        log?.Report(T($"[Unfollow] Mở lại modal Following thất bại ({retryEx.Message}) — tiếp tục chờ...",
+                                      $"[Unfollow] Reopen Following modal failed ({retryEx.Message}) — waiting..."));
+                    }
+
+                    await Task.Delay(1000, ct);
+                    continue;
+                }
+
+                // Heartbeat so a long stall reads as "still working" rather than going silent.
+                log?.Report($"[Unfollow] Đang chờ tải thêm... ({accounts.Count} đã thấy / {count} trong DOM, {stopwatch.Elapsed:mm\\:ss} trôi qua)");
             }
             else
             {
                 noChangeCount = 0;
-                log?.Report($"[Unfollow] Đã tìm thấy {count} tài khoản đang theo dõi...");
+                log?.Report($"[Unfollow] Đã tìm thấy {accounts.Count} tài khoản ({count} hiện trong DOM)...");
             }
 
-            prevCount = count;
+            prevSeenCount = seen.Count;
 
-            if (count > 0)
+            if (scan.Found && count > 0)
             {
                 try
                 {
-                    // Several SMALL wheel ticks, not one big jump — confirmed live 2026-09-13 that
-                    // a single large WheelAsync(0, 2000) wasn't reliable at triggering further
-                    // loading in this panel. A real human scroll arrives as a sequence of small
-                    // deltas with gaps between them (letting the browser fire intermediate
-                    // scroll/intersection events as content comes into view), so this mimics that
-                    // instead of jumping straight to the bottom in one motion.
-                    var box = await itemsLocator.Nth(count - 1).BoundingBoxAsync();
-                    if (box is not null)
+                    // Scroll the MODAL's own container (found relative to the modal root, never via the
+                    // page-wide row selector — that one also matches the 5-row sidebar widget).
+                    var scrollJson = await page.EvaluateAsync<string?>(ScrollModalJs, new { sel = selectors.FollowingItem, own = username });
+                    if (scrollJson is not null)
                     {
-                        await page.Mouse.MoveAsync(box.X + box.Width / 2, box.Y + box.Height / 2);
-                        for (var tick = 0; tick < 10; tick++)
+                        using var sd = JsonDocument.Parse(scrollJson);
+                        var r = sd.RootElement;
+                        if (accounts.Count <= 30 || noChangeCount > 0)
                         {
-                            await page.Mouse.WheelAsync(0, 350);
-                            await Task.Delay(150, ct);
+                            lastScrollInfo = $"scrollH={r.GetProperty("sh").GetDouble():0} clientH={r.GetProperty("ch").GetDouble():0} scrollTop={r.GetProperty("st").GetDouble():0}";
+                            log?.Report($"[Unfollow][DBG] modal rows={count} scrollH={r.GetProperty("sh").GetDouble():0} clientH={r.GetProperty("ch").GetDouble():0} scrollTop={r.GetProperty("st").GetDouble():0}");
+                        }
+
+                        // Trusted wheel events over the modal's scroll area, in case TikTok's
+                        // load-more is driven by wheel handlers rather than the scroll position.
+                        await page.Mouse.MoveAsync((float)r.GetProperty("x").GetDouble(), (float)r.GetProperty("y").GetDouble());
+                        for (var tick = 0; tick < 4; tick++)
+                        {
+                            await page.Mouse.WheelAsync(0, 500);
+                            await Task.Delay(200, ct);
                         }
                     }
                 }
-                catch
+                catch (Exception ex) when (!ct.IsCancellationRequested)
                 {
-                    // Fall back to the previous, less reliable approach if the popup handle is
-                    // somehow gone (e.g. modal closed) — better than throwing mid-scrape.
-                    await itemsLocator.Nth(count - 1).ScrollIntoViewIfNeededAsync();
+                    log?.Report($"[Unfollow][DBG] scroll error: {ex.Message}");
                 }
             }
 
-            // Shorter than before — with the account owner actively helping by scrolling the
-            // panel by hand alongside this loop, checking more often picks up manually-triggered
-            // progress sooner. noChangeCount's ceiling was raised to 35 (from 20) to keep the same
-            // overall patience floor despite polling twice as often.
-            await Task.Delay(1000, ct);
+            // After scrolling, give TikTok's API time to respond. TikTok lazy-loads the next
+            // batch only after its IntersectionObserver sentinel enters the viewport; the API call
+            // itself takes 1–3 s on a normal connection. Polling every 1 s missed batches that
+            // arrived in 2–3 s; 3 s catches them reliably without wasting much total time.
+            await Task.Delay(3000, ct);
         }
+
+        page.Response -= OnApiResponse;
+
+        foreach (var kv in batchInfo)
+        {
+            log?.Report($"[Unfollow][DBG] API list: {kv.Value} (batches={batchCounts.GetValueOrDefault(kv.Key)})");
+        }
+        log?.Report($"[Unfollow][DBG] final: scraped={accounts.Count} total={totalFollowing?.ToString() ?? "?"} {lastScrollInfo}");
+
+        // Apply userId, videoCount, and relation captured from TikTok's own API calls during list load.
+        var interceptedCount = 0;
+        foreach (var account in accounts)
+        {
+            if (capturedUsers.TryGetValue(account.Username, out var captured))
+            {
+                if (string.IsNullOrEmpty(account.UserId) && !string.IsNullOrEmpty(captured.UserId))
+                    account.UserId = captured.UserId;
+                if (account.VideoCount < 0 && captured.VideoCount >= 0)
+                    account.VideoCount = captured.VideoCount;
+                if (account.Relation < 0 && captured.Relation >= 0)
+                    account.Relation = captured.Relation;
+                interceptedCount++;
+            }
+        }
+        if (interceptedCount > 0)
+            log?.Report($"[Unfollow] API intercept: lấy được userId/videoCount cho {interceptedCount}/{accounts.Count} kênh (không cần visit profile).");
 
         if (accounts.Count == 0)
         {
@@ -455,6 +622,218 @@ public sealed class PlaywrightService : IAsyncDisposable
         }
 
         return accounts;
+    }
+
+    // Rows are matched by the page-wide row selector, but ONLY the visible ones count — the
+    // collapsed sidebar widget (a fixed 5 rows that can never scroll) matches the same selector
+    // and is what the scraper used to read instead of the real list.
+    private const string RowsPreambleJs = """
+        const vis = e => e.getClientRects().length > 0;
+        const rowsOf = sel => [...document.querySelectorAll(sel)].filter(vis);
+        const linkOf = r => r.matches('a[href*="/@"]') ? r : (r.querySelector('a[href*="/@"]') || r.closest('a[href*="/@"]'));
+        """;
+
+    private const string ScanModalJs = "(arg) => {" + RowsPreambleJs + """
+        const rows = rowsOf(arg.sel);
+        const seen = new Set();
+        const out = [];
+        for (const r of rows) {
+          const a = linkOf(r);
+          if (!a) continue;
+          const m = (a.getAttribute('href') || '').match(/\/@([^\/?#]+)/);
+          if (!m) continue;
+          const u = decodeURIComponent(m[1]);
+          const k = u.toLowerCase();
+          if (seen.has(k) || k === (arg.own || '').toLowerCase()) continue;
+          seen.add(k);
+          const lines = (r.innerText || '').split('\n').map(s => s.trim())
+            .filter(s => s && !/^(Following|Follow|Friends|Remove|Message|View|Xem)$/i.test(s));
+          out.push({ u: u, n: (lines[0] && lines[0] !== u) ? lines[0] : u });
+        }
+        return JSON.stringify({ found: rows.length > 0, rows: out });
+        }
+        """;
+
+    private const string ScrollModalJs = "(arg) => {" + RowsPreambleJs + """
+        const rows = rowsOf(arg.sel);
+        const last = rows[rows.length - 1];
+        if (!last) return null;
+        let el = last.parentElement, sc = null;
+        while (el && el !== document.body && el !== document.documentElement) {
+          const ov = getComputedStyle(el).overflowY;
+          if (el.scrollHeight > el.clientHeight + 2 && ov !== 'visible') { sc = el; break; }
+          el = el.parentElement;
+        }
+        last.scrollIntoView({ block: 'end' });
+        if (sc) {
+          sc.scrollTop = sc.scrollHeight;
+          sc.dispatchEvent(new Event('scroll', { bubbles: true }));
+        }
+        const r = (sc || last).getBoundingClientRect();
+        return JSON.stringify({ x: r.x + r.width / 2, y: r.y + r.height / 2,
+          sh: sc ? sc.scrollHeight : 0, ch: sc ? sc.clientHeight : 0, st: sc ? sc.scrollTop : 0 });
+        }
+        """;
+
+    private static async Task<(bool Found, List<(string User, string Nick)> Rows)> ScanFollowingModalAsync(
+        IPage page, string ownUsername, string rowSelector)
+    {
+        var rows = new List<(string, string)>();
+        try
+        {
+            var json = await page.EvaluateAsync<string>(ScanModalJs, new { sel = rowSelector, own = ownUsername });
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            if (!root.GetProperty("found").GetBoolean())
+            {
+                return (false, rows);
+            }
+
+            foreach (var row in root.GetProperty("rows").EnumerateArray())
+            {
+                rows.Add((row.GetProperty("u").GetString() ?? "", row.GetProperty("n").GetString() ?? ""));
+            }
+
+            return (true, rows);
+        }
+        catch
+        {
+            return (false, rows);
+        }
+    }
+
+    /// <summary>Opens the full "Following accounts" list: tiktok.com/following -> sidebar
+    /// "View all". Confirmed by hand (2026-10-27) to keep loading well past the 60-row cap that
+    /// the profile-page "Following N" modal hits (TikTok-side limit, reproduced scrolling manually).</summary>
+    private static async Task OpenFollowingPanelAsync(IPage page, string rowSelector, string ownUsername, CancellationToken ct)
+    {
+        // TikTok collapses the left sidebar to icons (no "View all" link) on narrow windows, and the
+        // real Chrome window may be snapped/half-screen — so force a wide emulated viewport.
+        await page.SetViewportSizeAsync(1440, 900);
+        await page.GotoAsync("https://www.tiktok.com/following?lang=en", new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
+        // No whole-page 'error page' check here: the video feed can show 'Something went wrong' while the
+        // sidebar (with 'View all') still works. If the link truly is missing, the wait below times out.
+        var viewAll = page.GetByText(new System.Text.RegularExpressions.Regex("^(View all|Xem tất cả)$")).First;
+        await viewAll.WaitForAsync(new LocatorWaitForOptions { Timeout = 25_000 });
+        await viewAll.ClickAsync();
+        await Task.Delay(2000, ct);
+
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            var (found, rows) = await ScanFollowingModalAsync(page, ownUsername, rowSelector);
+            if (found && rows.Count > 0)
+            {
+                return;
+            }
+
+            await Task.Delay(500, ct);
+        }
+
+        throw new TimeoutException("Panel Following không xuất hiện.");
+    }
+
+    /// <summary>Diagnostic only: remembers the shape of the latest paged API response (hasMore,
+    /// cursors, list size, top-level keys) per path so the final log can show whether TikTok itself
+    /// stopped paginating. Never throws.</summary>
+    private static void RecordListBatch(
+        string body, string urlPath, ConcurrentDictionary<string, string> info, ConcurrentDictionary<string, int> counts)
+    {
+        if (string.IsNullOrWhiteSpace(body) || !body.TrimStart().StartsWith('{')) return;
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            var r = doc.RootElement;
+            if (!r.TryGetProperty("hasMore", out var hasMore)) return;
+
+            var size = -1;
+            foreach (var prop in r.EnumerateObject())
+            {
+                if (prop.Value.ValueKind == JsonValueKind.Array) { size = prop.Value.GetArrayLength(); break; }
+            }
+
+            string Get(string n) => r.TryGetProperty(n, out var v) ? v.ToString() : "-";
+            var path = urlPath.Replace("https://www.tiktok.com", "");
+            counts.AddOrUpdate(path, 1, (_, c) => c + 1);
+            info[path] = $"{path} lastBatchSize={size} hasMore={hasMore} cursor={Get("cursor")} minCursor={Get("minCursor")} maxCursor={Get("maxCursor")} total={Get("total")} isTruncated={Get("isTruncated")} keys=[{string.Join(",", r.EnumerateObject().Select(x => x.Name))}]";
+        }
+        catch { /* diagnostics must never break the scrape */ }
+    }
+    /// <summary>Tries to extract user records (uniqueId → userId + videoCount) from any TikTok
+    /// API JSON response. TikTok embeds user objects in several different response shapes — this
+    /// walks the JSON recursively looking for objects that contain both "uniqueId" and "id" fields
+    /// (the canonical user-record fingerprint) and records them into <paramref name="result"/>.
+    /// Never throws — a parse failure for one response must not interrupt the list-loading loop.
+    /// </summary>
+    private static void ExtractUserDataFromApiResponse(
+        string json,
+        ConcurrentDictionary<string, (string UserId, int VideoCount, int Relation)> result)
+    {
+        if (string.IsNullOrWhiteSpace(json) || !json.TrimStart().StartsWith('{')) return;
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            WalkJsonForUserRecords(doc.RootElement, result, depth: 0);
+        }
+        catch { /* malformed JSON or unexpected schema — silently skip */ }
+    }
+
+    private static void WalkJsonForUserRecords(
+        JsonElement el,
+        ConcurrentDictionary<string, (string UserId, int VideoCount, int Relation)> result,
+        int depth)
+    {
+        if (depth > 10) return;
+
+        switch (el.ValueKind)
+        {
+            case JsonValueKind.Array:
+                foreach (var item in el.EnumerateArray())
+                    WalkJsonForUserRecords(item, result, depth + 1);
+                break;
+
+            case JsonValueKind.Object:
+                // Pattern A — flat user object: { "uniqueId": "...", "id": "...", "videoCount": N, "relation": N }
+                if (el.TryGetProperty("uniqueId", out var uqA) && el.TryGetProperty("id", out var idA))
+                {
+                    var vcA = el.TryGetProperty("videoCount", out var vcElA) && vcElA.ValueKind == JsonValueKind.Number
+                        ? vcElA.GetInt32() : -1;
+                    var relA = el.TryGetProperty("relation", out var relElA) && relElA.ValueKind == JsonValueKind.Number
+                        ? relElA.GetInt32() : -1;
+                    RecordUser(uqA, idA, vcA, relA, result);
+                }
+
+                // Pattern B — nested: { "user": { "uniqueId": "...", "id": "...", "relation": N }, "stats": { "videoCount": N } }
+                if (el.TryGetProperty("user", out var userEl)
+                    && userEl.TryGetProperty("uniqueId", out var uqB)
+                    && userEl.TryGetProperty("id", out var idB))
+                {
+                    var vcB = -1;
+                    if (el.TryGetProperty("stats", out var stats) && stats.TryGetProperty("videoCount", out var svc) && svc.ValueKind == JsonValueKind.Number)
+                        vcB = svc.GetInt32();
+                    else if (userEl.TryGetProperty("videoCount", out var uvc) && uvc.ValueKind == JsonValueKind.Number)
+                        vcB = uvc.GetInt32();
+                    var relB = userEl.TryGetProperty("relation", out var relElB) && relElB.ValueKind == JsonValueKind.Number
+                        ? relElB.GetInt32() : -1;
+                    RecordUser(uqB, idB, vcB, relB, result);
+                }
+
+                // Walk all properties regardless of whether we matched above — response may have
+                // multiple levels of user lists (e.g. a "recommended" array inside a following list).
+                foreach (var prop in el.EnumerateObject())
+                    WalkJsonForUserRecords(prop.Value, result, depth + 1);
+                break;
+        }
+    }
+
+    private static void RecordUser(
+        JsonElement uniqueIdEl, JsonElement idEl, int videoCount, int relation,
+        ConcurrentDictionary<string, (string UserId, int VideoCount, int Relation)> result)
+    {
+        var uniqueId = uniqueIdEl.GetString() ?? "";
+        var userId   = idEl.GetString() ?? "";
+        if (string.IsNullOrEmpty(uniqueId) || string.IsNullOrEmpty(userId)) return;
+        result.TryAdd(uniqueId, (userId, videoCount, relation));
     }
 
     /// <summary>Best-effort diagnostic dump (screenshot + full page HTML) used when something
@@ -543,7 +922,8 @@ public sealed class PlaywrightService : IAsyncDisposable
     /// this now reads the button's aria-label BEFORE and AFTER clicking (TikTok renders it as
     /// "Following {name}" vs "Follow {name}") and only reports success if it actually flipped;
     /// on failure it saves a debug dump instead of silently lying about the result.</summary>
-    public async Task<bool> ClickUnfollowAsync(string username, SelectorsConfig selectors, CancellationToken ct = default)
+    public async Task<bool> ClickUnfollowAsync(
+        string username, SelectorsConfig selectors, string userId = "", CancellationToken ct = default)
     {
         EnsureLaunched();
         var page = _page!;
@@ -551,13 +931,81 @@ public sealed class PlaywrightService : IAsyncDisposable
         await page.GotoAsync($"https://www.tiktok.com/@{username}?lang=en", new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
         await Task.Delay(1000, ct);
 
+        // Accounts deleted from TikTok's CDN still appear in the following list (their record
+        // stays in TikTok's DB) but their profile page returns "Access Denied" from Akamai.
+        // Direct HttpClient calls to TikTok's API fail silently (confirmed: TikTok returns 2xx
+        // but doesn't perform the unfollow without a valid X-Bogus signature that only its own
+        // page JS can produce). Workaround: navigate to a live TikTok page and call fetch()
+        // from WITHIN that page context — TikTok's own fetch interceptor will sign the request.
+        var pageTitle = await page.TitleAsync();
+        var pageText = await page.EvaluateAsync<string>("document.body?.innerText ?? ''");
+        if (pageTitle.Contains("Access Denied", StringComparison.OrdinalIgnoreCase)
+            || pageText.Contains("Access Denied", StringComparison.OrdinalIgnoreCase)
+            || pageText.Contains("You don't have permission", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!string.IsNullOrEmpty(userId))
+            {
+                try
+                {
+                    // Navigate to a live TikTok page so TikTok's JS (and its fetch signing
+                    // interceptor) is active before we issue the unfollow API call.
+                    try
+                    {
+                        await page.GotoAsync("https://www.tiktok.com/",
+                            new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 10_000 });
+                    }
+                    catch { /* best effort — proceed even on timeout */ }
+
+                    var statusCode = await page.EvaluateAsync<int>(@"
+                        async (toUserId) => {
+                            try {
+                                const resp = await fetch('/api/relation/user/unfollow/', {
+                                    method: 'POST',
+                                    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+                                    credentials: 'include',
+                                    body: new URLSearchParams({ userId: toUserId, action_type: '1' })
+                                });
+                                const data = await resp.json().catch(() => ({}));
+                                return data.status_code ?? data.statusCode ?? -1;
+                            } catch (e) { return -999; }
+                        }
+                    ", userId);
+
+                    if (statusCode == 0) return true;
+                    // Non-zero status — API rejected (deleted account may have been purged from
+                    // relation DB too). Fall through to return true anyway: nothing more we can do.
+                }
+                catch { /* best effort */ }
+            }
+            return true; // account deleted/inaccessible — mark done regardless
+        }
+
         var button = page.Locator(selectors.UnfollowBtn).First;
         if (await button.CountAsync() == 0)
         {
             throw new InvalidOperationException($"Không tìm thấy nút Follow/Unfollow trên trang @{username} (selector '{selectors.UnfollowBtn}').");
         }
 
+        // Wait for the button to be visible and have its label rendered before reading — without
+        // this, aria-label and InnerText can both come back empty on a slow-loading profile page,
+        // causing the empty string to not match "Following" and silently returning true (i.e.
+        // "already unfollowed") without actually doing anything.
+        try
+        {
+            await button.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+        }
+        catch
+        {
+            // If the wait itself times out the button was never visible — fall through to the
+            // empty-string guard below which will throw a proper error.
+        }
+
         var before = (await button.GetAttributeAsync("aria-label")) ?? (await button.InnerTextAsync());
+        if (string.IsNullOrWhiteSpace(before))
+        {
+            throw new InvalidOperationException($"Nút Follow trên @{username} không load được text sau 5 giây — trang chưa render đủ. Thử lại sau.");
+        }
+
         if (!before.Contains("Following", StringComparison.OrdinalIgnoreCase))
         {
             // Already not following (someone/something else unfollowed it already, or the
@@ -568,13 +1016,16 @@ public sealed class PlaywrightService : IAsyncDisposable
         await button.ClickAsync();
         await Task.Delay(800, ct);
 
-        // TikTok's own "Unfollow?" confirmation isn't always a `<button>` — try a broad
-        // visible-text match first (covers menu items/divs too), falling back to the narrower
-        // button-only match for older/other DOM variants.
-        var confirm = page.GetByText("Unfollow", new PageGetByTextOptions { Exact = false }).First;
+        // TikTok's own "Unfollow?" confirmation isn't always a `<button>` — try scoped to
+        // [role='dialog'] first to avoid matching "Unfollow" text elsewhere on the page (nav
+        // links, section headings, etc.), then fall back to broader matches for older DOM variants.
+        var modal = page.Locator("[role='dialog']").First;
+        var hasModal = await modal.CountAsync() > 0;
+        var confirmScope = hasModal ? modal : (ILocator)page;
+        var confirm = confirmScope.GetByText("Unfollow", new LocatorGetByTextOptions { Exact = false }).First;
         if (await confirm.CountAsync() == 0)
         {
-            confirm = page.Locator("button:has-text('Unfollow')").First;
+            confirm = confirmScope.Locator("button:has-text('Unfollow')").First;
         }
         if (await confirm.CountAsync() > 0)
         {
@@ -626,7 +1077,7 @@ public sealed class PlaywrightService : IAsyncDisposable
     /// account, selector/schema drift, etc.); caller treats that as "unknown", never as "dead".
     /// LastPostUnixSeconds specifically stays null when the account has videos but the
     /// intercept simply didn't arrive in time (slow network) — never guessed from partial data.</summary>
-    public async Task<(string UserId, int VideoCount, long? LastPostUnixSeconds)?> GetUserDetailAsync(string username, CancellationToken ct = default)
+    public async Task<(string UserId, int VideoCount, long? LastPostUnixSeconds, int Relation)?> GetUserDetailAsync(string username, CancellationToken ct = default)
     {
         EnsureLaunched();
 
@@ -650,8 +1101,11 @@ public sealed class PlaywrightService : IAsyncDisposable
                 .GetProperty("webapp.user-detail")
                 .GetProperty("userInfo");
 
-            var userId = userInfo.GetProperty("user").GetProperty("id").GetString() ?? "";
+            var userEl2  = userInfo.GetProperty("user");
+            var userId    = userEl2.GetProperty("id").GetString() ?? "";
             var videoCount = userInfo.GetProperty("stats").GetProperty("videoCount").GetInt32();
+            var relation  = userEl2.TryGetProperty("relation", out var relEl) && relEl.ValueKind == JsonValueKind.Number
+                ? relEl.GetInt32() : -1;
 
             long? lastPostUnixSeconds = null;
             if (videoCount > 0)
@@ -672,8 +1126,15 @@ public sealed class PlaywrightService : IAsyncDisposable
                     // date unknown rather than guessing at it.
                 }
             }
+            else
+            {
+                // videoCount == 0 means the account never posted — no reason to wait for the
+                // item_list response. Discard the task so its 15-second timeout doesn't fire as
+                // an unobserved exception later (with 500+ accounts in a scan, those pile up fast).
+                _ = itemListTask.ContinueWith(_ => { }, TaskContinuationOptions.None);
+            }
 
-            return (userId, videoCount, lastPostUnixSeconds);
+            return (userId, videoCount, lastPostUnixSeconds, relation);
         }
         catch (OperationCanceledException)
         {
@@ -682,6 +1143,136 @@ public sealed class PlaywrightService : IAsyncDisposable
         catch
         {
             return null;
+        }
+    }
+
+    /// <summary>Same as <see cref="GetUserDetailAsync"/> but uses a CALLER-SUPPLIED page instead
+    /// of the shared <c>_page</c>. This makes it safe to call from multiple concurrent tasks that
+    /// each own their own page (opened via <see cref="NewPageAsync"/>). The caller is responsible
+    /// for closing the page when done.</summary>
+    private static async Task<(string UserId, int VideoCount, long? LastPostUnixSeconds, int Relation)?> GetUserDetailOnPageAsync(
+        IPage page, string username, CancellationToken ct)
+    {
+        try
+        {
+            var itemListTask = page.WaitForResponseAsync(
+                r => r.Url.Contains("/api/post/item_list/") && r.Ok,
+                new PageWaitForResponseOptions { Timeout = 15_000 });
+            // Observe any fault (e.g. page closed on an early return) so it is not reported later as an
+            // unobserved task exception.
+            _ = itemListTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
+
+            await page.GotoAsync($"https://www.tiktok.com/@{username}", new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
+            ct.ThrowIfCancellationRequested();
+
+            var raw = await page.EvaluateAsync<string?>(
+                "document.getElementById('__UNIVERSAL_DATA_FOR_REHYDRATION__')?.textContent ?? null");
+            if (string.IsNullOrEmpty(raw))
+            {
+                BumpDetailStat("raw_null (no hydration data - error/blocked page?)");
+                return null;
+            }
+
+            using var doc = JsonDocument.Parse(raw);
+            var userInfo = doc.RootElement
+                .GetProperty("__DEFAULT_SCOPE__")
+                .GetProperty("webapp.user-detail")
+                .GetProperty("userInfo");
+
+            var userEl2   = userInfo.GetProperty("user");
+            var userId    = userEl2.GetProperty("id").GetString() ?? "";
+            var videoCount = userInfo.GetProperty("stats").GetProperty("videoCount").GetInt32();
+            var relation  = userEl2.TryGetProperty("relation", out var relEl) && relEl.ValueKind == JsonValueKind.Number
+                ? relEl.GetInt32() : -1;
+
+            long? lastPostUnixSeconds = null;
+            if (videoCount > 0)
+            {
+                try
+                {
+                    var response = await itemListTask;
+                    var body = await response.TextAsync();
+                    using var itemDoc = JsonDocument.Parse(body);
+                    if (itemDoc.RootElement.TryGetProperty("itemList", out var itemList) && itemList.GetArrayLength() > 0)
+                    {
+                        lastPostUnixSeconds = itemList[0].GetProperty("createTime").GetInt64();
+                        BumpDetailStat("date_ok");
+                    }
+                    else
+                    {
+                        BumpDetailStat("itemlist_empty_or_missing (videoCount>0 but no itemList)");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    BumpDetailStat("itemlist_failed: " + ex.GetType().Name + " - " + ex.Message.Split('\n')[0]);
+                }
+            }
+            else
+            {
+                BumpDetailStat("no_videos");
+                _ = itemListTask.ContinueWith(_ => { }, TaskContinuationOptions.None);
+            }
+
+            return (userId, videoCount, lastPostUnixSeconds, relation);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            BumpDetailStat("profile_failed: " + ex.GetType().Name + " - " + ex.Message.Split('\n')[0]);
+            return null;
+        }
+    }
+
+    private static readonly ConcurrentDictionary<string, int> DetailStats = new();
+
+    private static void BumpDetailStat(string key) => DetailStats.AddOrUpdate(key, 1, (_, c) => c + 1);
+
+    public static void ResetDetailStats() => DetailStats.Clear();
+
+    /// <summary>Why profile visits did or did not yield a last-post date during the current scan
+    /// (reason -> count), most common first. For the log only.</summary>
+    public static string DescribeDetailStats() =>
+        string.Join(" | ", DetailStats.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Value}x {kv.Key}"));
+    /// <summary>Opens a fresh page in the shared browser context, fetches the user detail for
+    /// <paramref name="username"/> via <see cref="GetUserDetailOnPageAsync"/>, then closes the
+    /// page. Safe to call concurrently from multiple tasks as long as the browser context is
+    /// still open. Returns null on any failure so callers never need to catch.</summary>
+    public async Task<(string UserId, int VideoCount, long? LastPostUnixSeconds, int Relation)?> GetUserDetailParallelAsync(
+        string username, CancellationToken ct = default)
+    {
+        EnsureLaunched();
+        var page = await _context!.NewPageAsync();
+        try
+        {
+            return await GetUserDetailOnPageAsync(page, username, ct);
+        }
+        finally
+        {
+            try { await page.CloseAsync(); } catch { }
+        }
+    }
+
+    /// <summary>Lightweight session liveness check — reads the sessionid cookie from the browser
+    /// context (no network round-trip). Returns false if the cookie is missing or empty, which
+    /// happens when TikTok has invalidated the session (redirect to login). Returns true on any
+    /// error so an uncertain check never aborts a long-running scan.</summary>
+    public async Task<bool> IsSessionActiveAsync(CancellationToken ct = default)
+    {
+        if (_context is null) return false;
+        try
+        {
+            var cookies = await _context.CookiesAsync(["https://www.tiktok.com"]);
+            return cookies.Any(c =>
+                c.Name.Equals("sessionid", StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrEmpty(c.Value));
+        }
+        catch
+        {
+            return true; // benefit of the doubt — don't abort scan on an uncertain check
         }
     }
 

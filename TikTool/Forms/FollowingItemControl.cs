@@ -10,10 +10,13 @@ public sealed class FollowingItemControl : Guna2Panel
 {
     public FollowingAccount Account { get; }
     public event Action? SelectionChanged;
+    /// <summary>Raised khi user toggle whitelist từ right-click menu — true = thêm, false = xóa.</summary>
+    public event Action<FollowingAccount, bool>? WhitelistToggled;
 
     private readonly CheckBox _checkbox;
     private readonly Label _metaLabel;
     private readonly Label _statusBadge;
+    private readonly Label _whitelistIcon;
 
     public FollowingItemControl(FollowingAccount account, int width)
     {
@@ -94,17 +97,60 @@ public sealed class FollowingItemControl : Guna2Panel
             BackColor = Theme.Panel,
         };
 
+        _whitelistIcon = new Label
+        {
+            Text = account.IsWhitelisted ? "🔒" : "",
+            Font = new Font("Segoe UI", 9f),
+            ForeColor = ColorTranslator.FromHtml("#fbbf24"),
+            AutoSize = false,
+            Size = new Size(24, 22),
+            Location = new Point(width - 164, 15),
+            TextAlign = ContentAlignment.MiddleCenter,
+            BackColor = Theme.Panel,
+        };
+
         Controls.Add(_checkbox);
         Controls.Add(avatar);
         Controls.Add(nameLabel);
         Controls.Add(_metaLabel);
         Controls.Add(_statusBadge);
+        Controls.Add(_whitelistIcon);
 
         EventHandler toggle = (_, _) => _checkbox.Checked = !_checkbox.Checked;
         Click += toggle;
         nameLabel.Click += toggle;
         _metaLabel.Click += toggle;
+
+        // Right-click context menu để whitelist/unwhitelist
+        var ctxMenu = new ContextMenuStrip();
+        ctxMenu.Opening += (_, _) =>
+        {
+            ctxMenu.Items.Clear();
+            if (Account.IsWhitelisted)
+            {
+                ctxMenu.Items.Add(T("🔓  Bỏ bảo vệ kênh này", "🔓  Remove from whitelist"), null, (_, _) =>
+                {
+                    Account.IsWhitelisted = false;
+                    WhitelistToggled?.Invoke(Account, false);
+                    RefreshStatus();
+                });
+            }
+            else
+            {
+                ctxMenu.Items.Add(T("🔒  Bảo vệ kênh này (không unfollow)", "🔒  Protect this channel (never unfollow)"), null, (_, _) =>
+                {
+                    Account.IsWhitelisted = true;
+                    Account.IsSelected = false;
+                    _checkbox.Checked = false;
+                    WhitelistToggled?.Invoke(Account, true);
+                    RefreshStatus();
+                });
+            }
+        };
+        ContextMenuStrip = ctxMenu;
     }
+
+    private static string T(string vi, string _en) => vi; // stub — theo pattern của UnfollowPage
 
     /// <summary>Called after an async video-count check or unfollow attempt updates the
     /// underlying <see cref="FollowingAccount"/> — repaints the meta line and status badge.</summary>
@@ -113,6 +159,8 @@ public sealed class FollowingItemControl : Guna2Panel
         _metaLabel.Text = BuildMetaText();
         _statusBadge.Text = BadgeText();
         _statusBadge.ForeColor = BadgeColor();
+        _whitelistIcon.Text = Account.IsWhitelisted ? "🔒" : "";
+        _checkbox.Enabled = !Account.IsWhitelisted;
     }
 
     private string BuildMetaText()

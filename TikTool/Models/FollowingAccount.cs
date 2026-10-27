@@ -21,10 +21,20 @@ public class FollowingAccount
         ? (int)(DateTimeOffset.UtcNow - DateTimeOffset.FromUnixTimeSeconds(s)).TotalDays
         : null;
 
+    // relation value from TikTok's API / UNIVERSAL_DATA_FOR_REHYDRATION:
+    //   0 = no relation, 1 = I follow them only, 2 = mutual (friend / follows back)
+    // -1 = unknown (not yet fetched). Set during LoadFollowing (API interceptor) or CheckDead (profile visit).
+    public int Relation { get; set; } = -1;
+
+    /// <summary>True when the account follows back (mutual follow, TikTok relation == 2).
+    /// Populated during list load or dead-channel scan. Unknown until then (Relation == -1).</summary>
+    public bool IsFriend => Relation == 2;
+
     // Set bởi UnfollowPage theo tiêu chí người dùng chọn (0 video, hoặc không đăng quá N ngày)
     // — không tự tính cứng ở đây vì "kênh chết" là một lựa chọn của người dùng, không phải một
     // sự thật cố định của dữ liệu.
     public bool IsDead { get; set; }
+    public bool IsWhitelisted { get; set; }
 
     public bool IsSelected { get; set; }
     public UnfollowStatus Status { get; set; } = UnfollowStatus.Pending;
