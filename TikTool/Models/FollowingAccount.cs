@@ -36,6 +36,12 @@ public class FollowingAccount
     public bool IsDead { get; set; }
     public bool IsWhitelisted { get; set; }
 
+    /// <summary>Signed avatar link from TikTok's list API (expires, so it is downloaded right away).</summary>
+    public string? AvatarUrl { get; set; }
+
+    /// <summary>Local cached avatar file, when one has been downloaded.</summary>
+    public string? AvatarPath { get; set; }
+
     public bool IsSelected { get; set; }
     public UnfollowStatus Status { get; set; } = UnfollowStatus.Pending;
     public string? ErrorMessage { get; set; }

@@ -61,7 +61,7 @@ public sealed class PlaywrightService : IAsyncDisposable
         {
             throw new InvalidOperationException(
                 "Không tìm thấy Google Chrome hoặc Microsoft Edge trên máy.\n" +
-                "TikTool cần attach vào Chrome/Edge thật (TikTok chặn trình duyệt tự động).\n" +
+                "Social Toolkit cần attach vào Chrome/Edge thật (TikTok chặn trình duyệt tự động).\n" +
                 "Hãy cài Google Chrome: https://www.google.com/chrome/");
         }
 
@@ -133,7 +133,7 @@ public sealed class PlaywrightService : IAsyncDisposable
 
         var answer = MessageBox.Show(
             "Không tìm thấy Google Chrome hoặc Microsoft Edge trên máy.\n\n" +
-            "TikTool cần attach vào Chrome thật vì TikTok chặn trình duyệt tự động.\n\n" +
+            "Social Toolkit cần attach vào Chrome thật vì TikTok chặn trình duyệt tự động.\n\n" +
             "Cài Google Chrome tự động? (~80 MB)",
             "Cần Chrome để dùng tính năng Unfollow",
             MessageBoxButtons.YesNo,
@@ -372,6 +372,7 @@ public sealed class PlaywrightService : IAsyncDisposable
         // network cost) populates UserId and VideoCount for each account without separate profile
         // visits, which both avoids rate-limiting and handles deleted accounts (Access Denied on
         // their profile page) since we have their userId from the list load instead.
+        CapturedAvatarUrls.Clear();
         var capturedUsers = new ConcurrentDictionary<string, (string UserId, int VideoCount, int Relation)>(StringComparer.OrdinalIgnoreCase);
 
         // Diagnostics: last paged-list response seen per API path (hasMore/cursor/size), so a stall
@@ -597,6 +598,25 @@ public sealed class PlaywrightService : IAsyncDisposable
                 interceptedCount++;
             }
         }
+        var avatarCount = 0;
+        foreach (var account in accounts)
+        {
+            if (CapturedAvatarUrls.TryGetValue(account.Username, out var avatarUrl))
+            {
+                account.AvatarUrl = avatarUrl;
+                avatarCount++;
+            }
+        }
+
+        var avatarHost = "-";
+        var sampleUrl = accounts.Select(a => a.AvatarUrl).FirstOrDefault(u => !string.IsNullOrEmpty(u));
+        if (sampleUrl is not null && Uri.TryCreate(sampleUrl, UriKind.Absolute, out var sampleUri))
+        {
+            avatarHost = sampleUri.Host + " ..." + Path.GetExtension(sampleUri.AbsolutePath);
+        }
+
+        log?.Report($"[Unfollow][DBG] Avatar links captured: {avatarCount}/{accounts.Count} (sample host: {avatarHost})");
+
         if (interceptedCount > 0)
             log?.Report($"[Unfollow] API intercept: lấy được userId/videoCount cho {interceptedCount}/{accounts.Count} kênh (không cần visit profile).");
 
@@ -801,6 +821,7 @@ public sealed class PlaywrightService : IAsyncDisposable
                     var relA = el.TryGetProperty("relation", out var relElA) && relElA.ValueKind == JsonValueKind.Number
                         ? relElA.GetInt32() : -1;
                     RecordUser(uqA, idA, vcA, relA, result);
+                    RecordAvatar(uqA, el);
                 }
 
                 // Pattern B — nested: { "user": { "uniqueId": "...", "id": "...", "relation": N }, "stats": { "videoCount": N } }
@@ -816,6 +837,7 @@ public sealed class PlaywrightService : IAsyncDisposable
                     var relB = userEl.TryGetProperty("relation", out var relElB) && relElB.ValueKind == JsonValueKind.Number
                         ? relElB.GetInt32() : -1;
                     RecordUser(uqB, idB, vcB, relB, result);
+                    RecordAvatar(uqB, userEl);
                 }
 
                 // Walk all properties regardless of whether we matched above — response may have
@@ -823,6 +845,23 @@ public sealed class PlaywrightService : IAsyncDisposable
                 foreach (var prop in el.EnumerateObject())
                     WalkJsonForUserRecords(prop.Value, result, depth + 1);
                 break;
+        }
+    }
+
+    private static readonly ConcurrentDictionary<string, string> CapturedAvatarUrls = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Remembers an account's avatar link from the same user object the userId/videoCount are read from.</summary>
+    private static void RecordAvatar(JsonElement uniqueIdEl, JsonElement userObj)
+    {
+        var uniqueId = uniqueIdEl.GetString();
+        if (string.IsNullOrEmpty(uniqueId)) return;
+        foreach (var name in new[] { "avatarThumb", "avatarMedium", "avatarLarger" })
+        {
+            if (userObj.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String && !string.IsNullOrEmpty(v.GetString()))
+            {
+                CapturedAvatarUrls.TryAdd(uniqueId, v.GetString()!);
+                return;
+            }
         }
     }
 

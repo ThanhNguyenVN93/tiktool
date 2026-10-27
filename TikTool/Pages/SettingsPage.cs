@@ -261,7 +261,7 @@ internal sealed class SettingsPage : UserControl
 
         return new List<Control>
         {
-            BuildRow("🖥", T("Khởi động cùng Windows","Start with Windows"), T("Tự mở TikTool khi đăng nhập máy","Auto-launch TikTool on login"), _startWithWindowsToggle),
+            BuildRow("🖥", T("Khởi động cùng Windows","Start with Windows"), T("Tự mở Social Toolkit khi đăng nhập máy","Auto-launch Social Toolkit on login"), _startWithWindowsToggle),
             BuildRow("🔽", T("Thu nhỏ xuống khay hệ thống","Minimize to tray"), T("Đóng cửa sổ sẽ ẩn app xuống system tray thay vì thoát","Closing the window hides the app to the system tray"), _minimizeToTrayToggle),
         };
     }

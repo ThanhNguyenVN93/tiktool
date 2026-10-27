@@ -213,7 +213,7 @@ public sealed class YtDlpService
         catch (System.ComponentModel.Win32Exception)
         {
             throw new InvalidOperationException(
-                "Không tìm thấy yt-dlp.exe. Hãy đặt file yt-dlp.exe vào thư mục cài đặt TikTool (Resources\\yt-dlp.exe) hoặc thêm vào PATH.");
+                "Không tìm thấy yt-dlp.exe. Hãy đặt file yt-dlp.exe vào thư mục cài đặt Social Toolkit (Resources\\yt-dlp.exe) hoặc thêm vào PATH.");
         }
 
         process.BeginOutputReadLine();

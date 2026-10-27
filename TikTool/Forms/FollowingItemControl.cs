@@ -17,6 +17,8 @@ public sealed class FollowingItemControl : Guna2Panel
     private readonly Label _metaLabel;
     private readonly Label _statusBadge;
     private readonly Label _whitelistIcon;
+    private readonly Guna2Panel _avatarHost;
+    private bool _avatarShown;
 
     public FollowingItemControl(FollowingAccount account, int width)
     {
@@ -62,6 +64,8 @@ public sealed class FollowingItemControl : Guna2Panel
             BackColor = avatarColor,
             Font = new Font("Segoe UI", 10f, FontStyle.Bold),
         });
+
+        _avatarHost = avatar;
 
         var nameLabel = new Label
         {
@@ -148,6 +152,61 @@ public sealed class FollowingItemControl : Guna2Panel
             }
         };
         ContextMenuStrip = ctxMenu;
+
+        TryApplyAvatar();
+    }
+
+    // Decoded avatars are shared between rows (the list is rebuilt on every filter/sort change), so
+    // each file is decoded once for the whole run instead of once per row per rebuild.
+    private static readonly Dictionary<string, Image> ImageCache = new();
+
+    private static Image? LoadImage(string path)
+    {
+        lock (ImageCache)
+        {
+            if (ImageCache.TryGetValue(path, out var cached))
+            {
+                return cached;
+            }
+
+            try
+            {
+                using var ms = new MemoryStream(File.ReadAllBytes(path));
+                using var source = Image.FromStream(ms);
+                var copy = new Bitmap(source);
+                ImageCache[path] = copy;
+                return copy;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+    }
+
+    /// <summary>Swaps the colored-initial placeholder for the real channel avatar once its file exists.</summary>
+    private void TryApplyAvatar()
+    {
+        if (_avatarShown || string.IsNullOrEmpty(Account.AvatarPath) || !File.Exists(Account.AvatarPath))
+        {
+            return;
+        }
+
+        var image = LoadImage(Account.AvatarPath);
+        if (image is null)
+        {
+            return;
+        }
+
+        _avatarHost.Controls.Clear();
+        _avatarHost.Controls.Add(new Guna2CirclePictureBox
+        {
+            Dock = DockStyle.Fill,
+            Image = image,
+            SizeMode = PictureBoxSizeMode.Zoom,
+            BackColor = Color.Transparent,
+        });
+        _avatarShown = true;
     }
 
     private static string T(string vi, string _en) => vi; // stub — theo pattern của UnfollowPage
@@ -156,6 +215,7 @@ public sealed class FollowingItemControl : Guna2Panel
     /// underlying <see cref="FollowingAccount"/> — repaints the meta line and status badge.</summary>
     public void RefreshStatus()
     {
+        TryApplyAvatar();
         _metaLabel.Text = BuildMetaText();
         _statusBadge.Text = BadgeText();
         _statusBadge.ForeColor = BadgeColor();

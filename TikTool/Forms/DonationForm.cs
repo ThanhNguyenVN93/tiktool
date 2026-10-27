@@ -7,7 +7,7 @@ internal sealed class DonationForm : Form
 {
     public DonationForm()
     {
-        Text = T("TikTool — Đóng góp", "TikTool — Donate");
+        Text = T("Social Toolkit — Đóng góp", "Social Toolkit — Donate");
         Size = new Size(420, 560);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -32,7 +32,7 @@ internal sealed class DonationForm : Form
 
         var sub = new Label
         {
-            Text = T("Mọi khoản ủng hộ giúp duy trì và phát triển TikTool.", "Every contribution helps maintain and grow TikTool."),
+            Text = T("Mọi khoản ủng hộ giúp duy trì và phát triển Social Toolkit.", "Every contribution helps maintain and grow Social Toolkit."),
             Font = new Font("Segoe UI", 8.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = true,

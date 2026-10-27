@@ -21,7 +21,7 @@ internal sealed class SplashForm : Form
         // — Logo / tên app —
         var lblApp = new Label
         {
-            Text      = "TikTool",
+            Text      = "Social Toolkit",
             Font      = new Font("Segoe UI", 28, FontStyle.Bold),
             ForeColor = Theme.Accent,
             AutoSize  = true,
@@ -31,7 +31,7 @@ internal sealed class SplashForm : Form
 
         var lblSub = new Label
         {
-            Text      = "TikTok Downloader & Unfollow Tool",
+            Text      = "Download & clean up your social accounts",
             Font      = new Font("Segoe UI", 9),
             ForeColor = Theme.TextMuted,
             AutoSize  = true,

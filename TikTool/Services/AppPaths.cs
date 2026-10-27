@@ -28,6 +28,16 @@ internal static class AppPaths
         }
     }
 
+    public static string AvatarDir
+    {
+        get
+        {
+            var dir = Path.Combine(AppDataDir, "avatars");
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+    }
+
     public static string SessionFile => Path.Combine(AppDataDir, "session_resume.dat");
     public static string WhitelistFile => Path.Combine(AppDataDir, "whitelist.dat");
 

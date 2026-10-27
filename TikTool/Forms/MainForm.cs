@@ -36,7 +36,7 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "TikTool";
+        Text = "Social Toolkit";
         StartPosition = FormStartPosition.CenterScreen;
         Size = new Size(1080, 700);
         MinimumSize = new Size(900, 600);
@@ -111,14 +111,14 @@ public sealed class MainForm : Form
     private void InitTrayIcon()
     {
         var menu = new ContextMenuStrip();
-        menu.Items.Add("Mở TikTool", null, (_, _) => RestoreFromTray());
+        menu.Items.Add("Mở Social Toolkit", null, (_, _) => RestoreFromTray());
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Thoát", null, (_, _) => { _trayIcon!.Visible = false; Application.Exit(); });
 
         _trayIcon = new NotifyIcon
         {
             Icon = SystemIcons.Application,
-            Text = "TikTool",
+            Text = "Social Toolkit",
             ContextMenuStrip = menu,
         };
         _trayIcon.DoubleClick += (_, _) => RestoreFromTray();
@@ -139,7 +139,7 @@ public sealed class MainForm : Form
             e.Cancel = true;
             Hide();
             _trayIcon!.Visible = true;
-            _trayIcon.ShowBalloonTip(2000, "TikTool", "Ứng dụng vẫn đang chạy trong khay hệ thống.", ToolTipIcon.Info);
+            _trayIcon.ShowBalloonTip(2000, "Social Toolkit", "Ứng dụng vẫn đang chạy trong khay hệ thống.", ToolTipIcon.Info);
             return;
         }
 
@@ -261,7 +261,7 @@ public sealed class MainForm : Form
 
         var title = new Label
         {
-            Text = "TikTool",
+            Text = "Social Toolkit",
             Font = Theme.FontTitle,
             ForeColor = Color.White,
             AutoSize = true,
@@ -269,7 +269,7 @@ public sealed class MainForm : Form
         };
         var sub = new Label
         {
-            Text = "2-in-1 Desktop",
+            Text = "Download & clean up",
             Font = new Font("Segoe UI", 7.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = true,

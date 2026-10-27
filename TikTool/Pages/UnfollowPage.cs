@@ -102,7 +102,7 @@ internal sealed class UnfollowPage : UserControl
             var datesMatter = CriteriaThresholdDays[_criteriaCombo.SelectedIndex] is not null;
             _btnCheckDates.Enabled = !_isBusy && needDates > 0 && datesMatter;
             _btnCheckDates.Text = needDates > 0
-                ? T($"📅  Kiểm tra ngày đăng ({needDates})", $"📅  Check last-post dates ({needDates})")
+                ? T($"📅  Kiểm tra ngày ({needDates})", $"📅  Check dates ({needDates})")
                 : T("📅  Đã đủ ngày đăng", "📅  All dates known");
             _btnClearSelection.Enabled = !_isBusy && anySelected;
             _btnStart.Enabled = _isBusy || selectedCount > 0;
@@ -470,7 +470,7 @@ internal sealed class UnfollowPage : UserControl
 
         _btnCheckDates = new Guna2Button
         {
-            Text = T("📅  Kiểm tra ngày đăng", "📅  Check last-post dates"),
+            Text = T("📅  Kiểm tra ngày", "📅  Check dates"),
             Font = Theme.FontMedium,
             Size = new Size(215, 32),
             Location = new Point(150, 12),
@@ -518,7 +518,7 @@ internal sealed class UnfollowPage : UserControl
                   $"Unfinished session from {saved.SavedAt:HH:mm dd/MM}.\n" +
                   $"Unfollowed {done}/{saved.Accounts.Count(a => a.IsSelected)}, {pending} pending.\n\n" +
                   $"Resume this session?"),
-                T("TikTool — Tiếp tục phiên cũ?", "TikTool — Resume session?"),
+                T("Social Toolkit — Tiếp tục phiên cũ?", "Social Toolkit — Resume session?"),
                 MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
             if (choice == DialogResult.Yes)
@@ -528,6 +528,7 @@ internal sealed class UnfollowPage : UserControl
                 ApplyWhitelistFlags();
                 RecomputeDeadStatus();
                 RebuildList();
+                StartAvatarDownloads();
                 _log.Log(T($"[Unfollow] Đã khôi phục {_accounts.Count} tài khoản từ phiên trước.",
                            $"[Unfollow] Restored {_accounts.Count} accounts from previous session."), LogLevel.Ok);
                 UpdateHeaderBadge();
@@ -576,8 +577,8 @@ internal sealed class UnfollowPage : UserControl
             {
                 var unknownDate = _accounts.Count(a => a.VideoCount > 0 && a.LastPostUnixSeconds == null);
                 if (unknownDate > 0)
-                    _log.Log(T($"[Unfollow] ⚠ {unknownDate} kênh có video nhưng không lấy được ngày đăng gần nhất — sẽ không bị tính là kênh chết theo tiêu chí ngày. Bấm nút 'Kiểm tra ngày đăng' ở thanh dưới để lấy dần (từng đợt nhỏ, an toàn).",
-                               $"[Unfollow] ⚠ {unknownDate} accounts have videos but last-post date is unknown — they won't be auto-marked dead by the day threshold. Use the 'Check last-post dates' button below to read them in small, safe batches."),
+                    _log.Log(T($"[Unfollow] ⚠ {unknownDate} kênh có video nhưng không lấy được ngày đăng gần nhất — sẽ không bị tính là kênh chết theo tiêu chí ngày. Bấm nút 'Kiểm tra ngày' ở thanh dưới để lấy dần (từng đợt nhỏ, an toàn).",
+                               $"[Unfollow] ⚠ {unknownDate} accounts have videos but last-post date is unknown — they won't be auto-marked dead by the day threshold. Use the 'Check dates' button below to read them in small, safe batches."),
                         LogLevel.Warn);
             }
 
@@ -585,6 +586,7 @@ internal sealed class UnfollowPage : UserControl
             _sessionStateService.SaveSession(_accounts, accounts.Count);
 
             RebuildList();
+            StartAvatarDownloads();
             _log.Log(T($"[Unfollow] Hoàn tất — {_accounts.Count(a => a.IsDead)} kênh chết / {_accounts.Count} tổng.",
                         $"[Unfollow] Done — {_accounts.Count(a => a.IsDead)} dead / {_accounts.Count} total."), LogLevel.Ok);
         }
@@ -883,6 +885,68 @@ internal sealed class UnfollowPage : UserControl
         }
     }
 
+    /// <summary>Shows channel avatars: reuses files already cached on disk, and downloads the rest in the
+    /// background (4 at a time). TikTok's avatar links expire, so this runs right after the list loads.</summary>
+    private void StartAvatarDownloads()
+    {
+        var toDownload = new List<FollowingAccount>();
+        foreach (var account in _accounts)
+        {
+            if (account.AvatarPath is not null && File.Exists(account.AvatarPath))
+            {
+                continue;
+            }
+
+            account.AvatarPath = AvatarCache.CachedPath(account.Username);
+            if (account.AvatarPath is not null)
+            {
+                RefreshRow(account);
+            }
+            else if (!string.IsNullOrEmpty(account.AvatarUrl))
+            {
+                toDownload.Add(account);
+            }
+        }
+
+        if (toDownload.Count == 0)
+        {
+            return;
+        }
+
+        _log.Log(T($"[Unfollow] Đang tải logo {toDownload.Count} kênh ở nền...", $"[Unfollow] Downloading {toDownload.Count} channel logos in the background..."), LogLevel.Info);
+
+        _ = Task.Run(async () =>
+        {
+            using var gate = new SemaphoreSlim(4);
+            var ok = 0;
+            await Task.WhenAll(toDownload.Select(async account =>
+            {
+                await gate.WaitAsync();
+                try
+                {
+                    var path = await AvatarCache.DownloadAsync(account.Username, account.AvatarUrl!, CancellationToken.None);
+                    if (path is not null)
+                    {
+                        account.AvatarPath = path;
+                        Interlocked.Increment(ref ok);
+                        RefreshRow(account);
+                    }
+                }
+                catch
+                {
+                    // one failed logo must never affect the others
+                }
+                finally
+                {
+                    gate.Release();
+                }
+            }));
+
+            _log.Log(T($"[Unfollow] Logo: tải được {ok}/{toDownload.Count} kênh.", $"[Unfollow] Logos: {ok}/{toDownload.Count} downloaded."),
+                ok > 0 ? LogLevel.Ok : LogLevel.Warn);
+        });
+    }
+
     /// <summary>Recomputes FollowingAccount.IsDead for every loaded account according to the
     /// currently selected "Tiêu chí kênh chết" combo — a channel that never posted (0 video) is
     /// always dead regardless of the selected day threshold; otherwise dead means the most
@@ -1113,7 +1177,7 @@ internal sealed class UnfollowPage : UserControl
                                 var choice = MessageBox.Show(
                                     T($"{rex.Message}\n\nTiếp tục unfollow các tài khoản còn lại?",
                                       $"{rex.Message}\n\nContinue unfollowing the remaining accounts?"),
-                                    "TikTool — Rate limit",
+                                    "Social Toolkit — Rate limit",
                                     MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
                                 if (choice == DialogResult.No) throw new OperationCanceledException();
                                 await Task.Delay(10_000, ct);

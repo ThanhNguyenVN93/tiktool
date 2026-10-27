@@ -417,7 +417,7 @@ internal sealed class HistoryPage : UserControl
         var confirm = MessageBox.Show(
             T("Xóa toàn bộ lịch sử? Hành động này không thể hoàn tác.",
               "Clear all history? This action cannot be undone."),
-            "TikTool",
+            "Social Toolkit",
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Warning);
         if (confirm != DialogResult.Yes)
@@ -439,7 +439,7 @@ internal sealed class HistoryPage : UserControl
         if (dialog.ShowDialog() != DialogResult.OK) return;
 
         File.WriteAllText(dialog.FileName, _historyService.ExportCsv());
-        MessageBox.Show($"Đã xuất {dialog.FileName}", "TikTool", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        MessageBox.Show($"Đã xuất {dialog.FileName}", "Social Toolkit", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     private void ExportUnfollowCsv()
@@ -463,7 +463,7 @@ internal sealed class HistoryPage : UserControl
         File.WriteAllText(dialog.FileName, sb.ToString());
         MessageBox.Show(T($"Đã xuất danh sách unfollow → {dialog.FileName}\nMở trang TikTok của từng kênh để follow lại.",
                           $"Exported unfollow list → {dialog.FileName}\nOpen each channel's TikTok page to re-follow."),
-                        "TikTool", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        "Social Toolkit", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     private static string CsvEscape(string value) =>
