@@ -23,6 +23,7 @@ public sealed class MainForm : Form
     private Guna2Button _unfollowParent = null!;
     private FlowLayoutPanel _unfollowChildren = null!;
     private bool _unfollowExpanded;
+    private YouTubePage? _youTubePage;
     private const string TikTokUnfollowKey = "unfollow";
     private const string YouTubeUnsubKey = "youtube-unsub";
 
@@ -73,7 +74,8 @@ public sealed class MainForm : Form
 
         RegisterPage("download", new DownloadPage(ytDlpService, historyService, settingsService, cookieService));
         RegisterPage(TikTokUnfollowKey, new UnfollowPage(playwrightService, tikTokApiService, cookieService, settingsService, historyService, sessionStateService));
-        RegisterPage(YouTubeUnsubKey, new YouTubeProbePage());
+        _youTubePage = new YouTubePage(settingsService, historyService);
+        RegisterPage(YouTubeUnsubKey, _youTubePage);
         var cookiePage = new CookiePage(cookieService, playwrightService);
         cookiePage.CookieStatusChanged += () => _ = RefreshFooterAsync();
         RegisterPage("cookie", cookiePage);
@@ -142,6 +144,10 @@ public sealed class MainForm : Form
 
         _trayIcon?.Dispose();
         _ = _playwrightServiceRef.DisposeAsync().AsTask();
+        if (_youTubePage is not null)
+        {
+            _ = _youTubePage.ShutdownAsync();
+        }
         base.OnFormClosing(e);
     }
 
