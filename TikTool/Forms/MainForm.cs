@@ -42,6 +42,9 @@ public sealed class MainForm : Form
         StartPosition = FormStartPosition.CenterScreen;
         Size = new Size(1080, 700);
         MinimumSize = new Size(900, 600);
+        // The pages use a fixed content width, so a bigger window only adds empty space: keep one size.
+        FormBorderStyle = FormBorderStyle.FixedSingle;
+        MaximizeBox = false;
         BackColor = Theme.Background;
         Font = Theme.FontRegular;
 
