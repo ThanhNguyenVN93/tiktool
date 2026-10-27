@@ -112,6 +112,11 @@ internal sealed class YouTubeService : IAsyncDisposable
         while (DateTime.UtcNow < deadline && !signedIn)
         {
             ct.ThrowIfCancellationRequested();
+            if (_host is not { IsRunning: true })
+            {
+                throw new InvalidOperationException(T("Cửa sổ trình duyệt đã đóng trước khi đăng nhập xong.", "The browser window was closed before sign-in finished."));
+            }
+
             await Task.Delay(2000, ct);
             try
             {
