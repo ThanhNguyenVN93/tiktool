@@ -36,7 +36,7 @@ public sealed class UpdateService
                 return;
             }
 
-            log?.Report("[Update] Đang kiểm tra bản cập nhật yt-dlp...");
+            log?.Report(T("[Update] Đang kiểm tra bản cập nhật yt-dlp...", "[Update] Checking for a yt-dlp update..."));
             using var process = Process.Start(new ProcessStartInfo
             {
                 FileName = _ytDlp.ExecutablePath,
@@ -53,11 +53,11 @@ public sealed class UpdateService
             }
 
             await process.WaitForExitAsync();
-            log?.Report(process.ExitCode == 0 ? "[Update] yt-dlp đã ở bản mới nhất." : "[Update] Kiểm tra yt-dlp thất bại (bỏ qua).");
+            log?.Report(process.ExitCode == 0 ? T("[Update] yt-dlp đã ở bản mới nhất.", "[Update] yt-dlp is up to date.") : T("[Update] Kiểm tra yt-dlp thất bại (bỏ qua).", "[Update] yt-dlp check failed (ignored)."));
         }
         catch (Exception ex)
         {
-            log?.Report($"[Update] Lỗi khi cập nhật yt-dlp: {ex.Message}");
+            log?.Report(T($"[Update] Lỗi khi cập nhật yt-dlp: {ex.Message}", $"[Update] Error updating yt-dlp: {ex.Message}"));
         }
     }
 
@@ -77,13 +77,13 @@ public sealed class UpdateService
             {
                 await File.WriteAllTextAsync(AppPaths.SelectorsFile, remoteJson);
                 SelectorsService.Invalidate();
-                log?.Report($"[Update] Đã cập nhật selectors.json ({local.Version} → {remote.Version}).");
+                log?.Report(T($"[Update] Đã cập nhật selectors.json ({local.Version} → {remote.Version}).", $"[Update] Updated selectors.json ({local.Version} → {remote.Version})."));
             }
         }
         catch (Exception ex)
         {
             // Không có mạng, repo chưa tồn tại, hoặc JSON hỏng — bỏ qua, dùng bản local.
-            log?.Report($"[Update] Không thể kiểm tra selectors.json: {ex.Message}");
+            log?.Report(T($"[Update] Không thể kiểm tra selectors.json: {ex.Message}", $"[Update] Could not check selectors.json: {ex.Message}"));
         }
     }
 

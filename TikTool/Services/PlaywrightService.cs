@@ -52,7 +52,7 @@ public sealed class PlaywrightService : IAsyncDisposable
                 FileName = chromePath,
                 Arguments = $"{headlessArg}--remote-debugging-port={port} --user-data-dir=\"{_profileDir}\" --no-first-run --no-default-browser-check --window-size=1440,900 about:blank",
                 UseShellExecute = false,
-            }) ?? throw new InvalidOperationException("Không khởi chạy được Chrome/Edge.");
+            }) ?? throw new InvalidOperationException(T("Không khởi chạy được Chrome/Edge.", "Could not start Chrome/Edge."));
 
             _browser = await ConnectWithRetryAsync(_playwright, port, CancellationToken.None);
             _context = _browser.Contexts.FirstOrDefault() ?? await _browser.NewContextAsync();
@@ -60,9 +60,9 @@ public sealed class PlaywrightService : IAsyncDisposable
         else
         {
             throw new InvalidOperationException(
-                "Không tìm thấy Google Chrome hoặc Microsoft Edge trên máy.\n" +
-                "Social Toolkit cần attach vào Chrome/Edge thật (TikTok chặn trình duyệt tự động).\n" +
-                "Hãy cài Google Chrome: https://www.google.com/chrome/");
+                T("Không tìm thấy Google Chrome hoặc Microsoft Edge trên máy.\n", "Google Chrome or Microsoft Edge was not found on this computer.\n") +
+                T("Social Toolkit cần attach vào Chrome/Edge thật (TikTok chặn trình duyệt tự động).\n", "Social Toolkit needs to attach to a real Chrome/Edge (TikTok blocks automated browsers).\n") +
+                T("Hãy cài Google Chrome: https://www.google.com/chrome/", "Please install Google Chrome: https://www.google.com/chrome/"));
         }
 
         await _context.AddCookiesAsync(BuildCookies(cookie));
@@ -132,15 +132,15 @@ public sealed class PlaywrightService : IAsyncDisposable
         if (FindRealChromeExecutable() is not null) return;
 
         var answer = MessageBox.Show(
-            "Không tìm thấy Google Chrome hoặc Microsoft Edge trên máy.\n\n" +
-            "Social Toolkit cần attach vào Chrome thật vì TikTok chặn trình duyệt tự động.\n\n" +
-            "Cài Google Chrome tự động? (~80 MB)",
-            "Cần Chrome để dùng tính năng Unfollow",
+            T("Không tìm thấy Google Chrome hoặc Microsoft Edge trên máy.\n\n", "Google Chrome or Microsoft Edge was not found on this computer.\n\n") +
+            T("Social Toolkit cần attach vào Chrome thật vì TikTok chặn trình duyệt tự động.\n\n", "Social Toolkit needs to attach to a real Chrome because TikTok blocks automated browsers.\n\n") +
+            T("Cài Google Chrome tự động? (~80 MB)", "Install Google Chrome automatically? (~80 MB)"),
+            T("Cần Chrome để dùng tính năng Unfollow", "Chrome is required for the Unfollow feature"),
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Question);
 
         if (answer != DialogResult.Yes)
-            throw new OperationCanceledException("Người dùng huỷ cài Chrome.");
+            throw new OperationCanceledException(T("Người dùng huỷ cài Chrome.", "The user cancelled the Chrome installation."));
 
         var setupPath = Path.Combine(Path.GetTempPath(), "tiktool_chrome_setup.exe");
 
@@ -175,7 +175,7 @@ public sealed class PlaywrightService : IAsyncDisposable
             FileName = setupPath,
             Arguments = "/silent /install",
             UseShellExecute = false,
-        }) ?? throw new InvalidOperationException("Không khởi chạy được Chrome installer.");
+        }) ?? throw new InvalidOperationException(T("Không khởi chạy được Chrome installer.", "Could not start the Chrome installer."));
 
         // Installer typically finishes in under 2 minutes on a normal machine.
         await Task.Run(() => install.WaitForExit(120_000), ct);
@@ -184,7 +184,7 @@ public sealed class PlaywrightService : IAsyncDisposable
 
         if (FindRealChromeExecutable() is null)
             throw new InvalidOperationException(
-                "Cài Chrome xong nhưng vẫn không tìm thấy — thử khởi động lại máy hoặc cài thủ công: " +
+                T("Cài Chrome xong nhưng vẫn không tìm thấy — thử khởi động lại máy hoặc cài thủ công: ", "Chrome was installed but still cannot be found — restart the computer or install it manually: ") +
                 "https://www.google.com/chrome/");
     }
 
@@ -217,8 +217,8 @@ public sealed class PlaywrightService : IAsyncDisposable
     {
         var chromePath = FindRealChromeExecutable()
             ?? throw new InvalidOperationException(
-                "Không tìm thấy Google Chrome hoặc Microsoft Edge trên máy. " +
-                "Hãy cài Chrome/Edge hoặc dùng cách 'Dán cookie thủ công' thay thế.");
+                T("Không tìm thấy Google Chrome hoặc Microsoft Edge trên máy. ", "Google Chrome or Microsoft Edge was not found on this computer. ") +
+                T("Hãy cài Chrome/Edge hoặc dùng cách 'Dán cookie thủ công' thay thế.", "Install Chrome/Edge or use the 'Paste cookie manually' method instead."));
 
         var port = GetFreeTcpPort();
         var profileDir = Path.Combine(Path.GetTempPath(), $"tiktool_chrome_login_{Guid.NewGuid():N}");
@@ -229,7 +229,7 @@ public sealed class PlaywrightService : IAsyncDisposable
             FileName = chromePath,
             Arguments = $"--remote-debugging-port={port} --user-data-dir=\"{profileDir}\" --no-first-run --no-default-browser-check https://www.tiktok.com/login",
             UseShellExecute = false,
-        }) ?? throw new InvalidOperationException("Không khởi chạy được Chrome thật.");
+        }) ?? throw new InvalidOperationException(T("Không khởi chạy được Chrome thật.", "Could not start the real Chrome."));
 
         try
         {
@@ -300,7 +300,7 @@ public sealed class PlaywrightService : IAsyncDisposable
             }
         }
 
-        throw new InvalidOperationException($"Không kết nối được vào Chrome thật qua CDP (cổng {port}).", lastError);
+        throw new InvalidOperationException(T($"Không kết nối được vào Chrome thật qua CDP (cổng {port}).", $"Could not connect to the real Chrome over CDP (port {port})."), lastError);
     }
 
     private static int GetFreeTcpPort()
@@ -432,7 +432,7 @@ public sealed class PlaywrightService : IAsyncDisposable
         if (!opened)
         {
             var dumpPath = await TryDumpDebugStateAsync(page, "following-modal-not-found");
-            var dumpNote = dumpPath is not null ? $" Đã lưu ảnh chụp + HTML để chẩn đoán: {dumpPath}" : "";
+            var dumpNote = dumpPath is not null ? T($" Đã lưu ảnh chụp + HTML để chẩn đoán: {dumpPath}", $" A screenshot + HTML were saved for diagnosis: {dumpPath}") : "";
             throw new InvalidOperationException(
                 T("Không thể mở danh sách Following sau 3 lần thử — TikTok chặn hoặc đổi DOM. Thử lại sau vài phút hoặc dùng VPN." + dumpNote,
                   "Could not open the Following list after 3 attempts — TikTok blocked or changed DOM. Retry after a few minutes or use a VPN." + dumpNote));
@@ -477,7 +477,7 @@ public sealed class PlaywrightService : IAsyncDisposable
             if (!scan.Found && ++modalMissingTicks == 3)
             {
                 var missPath = await TryDumpDebugStateAsync(page, "following-modal-root-missing");
-                log?.Report($"[Unfollow] Không xác định được modal Following (đã lưu chẩn đoán: {missPath}).");
+                log?.Report(T($"[Unfollow] Không xác định được modal Following (đã lưu chẩn đoán: {missPath}).", $"[Unfollow] Could not locate the Following list (diagnostics saved: {missPath})."));
             }
 
             if (seen.Count == prevSeenCount)
@@ -496,7 +496,7 @@ public sealed class PlaywrightService : IAsyncDisposable
                 // instead of waiting out the full 35-tick stall budget.
                 if (nearTotal && noChangeCount >= 5)
                 {
-                    log?.Report($"[Unfollow] Đã tải {accounts.Count}/{totalFollowing} kênh — danh sách đã hết, dừng.");
+                    log?.Report(T($"[Unfollow] Đã tải {accounts.Count}/{totalFollowing} kênh — danh sách đã hết, dừng.", $"[Unfollow] Loaded {accounts.Count}/{totalFollowing} accounts — the list is exhausted, stopping."));
                     break;
                 }
                 if (noChangeCount >= noChangeRetryThreshold && innerRetryCount < maxInnerRetries && !nearTotal)
@@ -504,8 +504,8 @@ public sealed class PlaywrightService : IAsyncDisposable
                     innerRetryCount++;
                     noChangeCount = 0;
                     log?.Report(
-                        $"[Unfollow] Kẹt {noChangeRetryThreshold}s tại {accounts.Count} tài khoản — " +
-                        $"đang mở lại panel (lần {innerRetryCount}/{maxInnerRetries})...");
+                        T($"[Unfollow] Kẹt {noChangeRetryThreshold}s tại {accounts.Count} tài khoản — ", $"[Unfollow] Stuck for {noChangeRetryThreshold}s at {accounts.Count} accounts — ") +
+                        T($"đang mở lại panel (lần {innerRetryCount}/{maxInnerRetries})...", $"reopening the panel (attempt {innerRetryCount}/{maxInnerRetries})..."));
 
                     try
                     {
@@ -525,12 +525,12 @@ public sealed class PlaywrightService : IAsyncDisposable
                 }
 
                 // Heartbeat so a long stall reads as "still working" rather than going silent.
-                log?.Report($"[Unfollow] Đang chờ tải thêm... ({accounts.Count} đã thấy / {count} trong DOM, {stopwatch.Elapsed:mm\\:ss} trôi qua)");
+                log?.Report(T($"[Unfollow] Đang chờ tải thêm... ({accounts.Count} đã thấy / {count} trong DOM, {stopwatch.Elapsed:mm\\:ss} trôi qua)", $"[Unfollow] Waiting for more... ({accounts.Count} seen / {count} in the page, {stopwatch.Elapsed:mm\\:ss} elapsed)"));
             }
             else
             {
                 noChangeCount = 0;
-                log?.Report($"[Unfollow] Đã tìm thấy {accounts.Count} tài khoản ({count} hiện trong DOM)...");
+                log?.Report(T($"[Unfollow] Đã tìm thấy {accounts.Count} tài khoản ({count} hiện trong DOM)...", $"[Unfollow] Found {accounts.Count} accounts ({count} shown in the page)..."));
             }
 
             prevSeenCount = seen.Count;
@@ -618,14 +618,14 @@ public sealed class PlaywrightService : IAsyncDisposable
         log?.Report($"[Unfollow][DBG] Avatar links captured: {avatarCount}/{accounts.Count} (sample host: {avatarHost})");
 
         if (interceptedCount > 0)
-            log?.Report($"[Unfollow] API intercept: lấy được userId/videoCount cho {interceptedCount}/{accounts.Count} kênh (không cần visit profile).");
+            log?.Report(T($"[Unfollow] API intercept: lấy được userId/videoCount cho {interceptedCount}/{accounts.Count} kênh (không cần visit profile).", $"[Unfollow] API intercept: got userId/videoCount for {interceptedCount}/{accounts.Count} accounts (no profile visits needed)."));
 
         if (accounts.Count == 0)
         {
             var dumpPath = await TryDumpDebugStateAsync(page, "empty-following-list");
             if (dumpPath is not null)
             {
-                log?.Report($"[Unfollow] 0 tài khoản — đã lưu ảnh chụp + HTML trang lúc đó để chẩn đoán: {dumpPath}");
+                log?.Report(T($"[Unfollow] 0 tài khoản — đã lưu ảnh chụp + HTML trang lúc đó để chẩn đoán: {dumpPath}", $"[Unfollow] 0 accounts — a screenshot + HTML of the page were saved for diagnosis: {dumpPath}"));
             }
         }
         else if (totalFollowing is int total && accounts.Count < total)
@@ -637,8 +637,8 @@ public sealed class PlaywrightService : IAsyncDisposable
             // accounts drop out of the list, the next load has fewer to get through and may well
             // surface further ones this run didn't reach.
             log?.Report(
-                $"[Unfollow] Tải được {accounts.Count}/{total} kênh trong lần này — TikTok có thể còn nhiều hơn nhưng dừng tải. " +
-                "Unfollow xong đợt này rồi bấm 'Tải lại' để thử lấy tiếp phần còn lại.");
+                T($"[Unfollow] Tải được {accounts.Count}/{total} kênh trong lần này — TikTok có thể còn nhiều hơn nhưng dừng tải. ", $"[Unfollow] Loaded {accounts.Count}/{total} accounts this time — TikTok may have more but stopped loading. ") +
+                T("Unfollow xong đợt này rồi bấm 'Tải lại' để thử lấy tiếp phần còn lại.", "Unfollow this batch, then click 'Reload' to try to get the rest."));
         }
 
         return accounts;
@@ -750,7 +750,7 @@ public sealed class PlaywrightService : IAsyncDisposable
             await Task.Delay(500, ct);
         }
 
-        throw new TimeoutException("Panel Following không xuất hiện.");
+        throw new TimeoutException(T("Panel Following không xuất hiện.", "The Following panel did not appear."));
     }
 
     /// <summary>Diagnostic only: remembers the shape of the latest paged API response (hasMore,
@@ -1022,7 +1022,7 @@ public sealed class PlaywrightService : IAsyncDisposable
         var button = page.Locator(selectors.UnfollowBtn).First;
         if (await button.CountAsync() == 0)
         {
-            throw new InvalidOperationException($"Không tìm thấy nút Follow/Unfollow trên trang @{username} (selector '{selectors.UnfollowBtn}').");
+            throw new InvalidOperationException(T($"Không tìm thấy nút Follow/Unfollow trên trang @{username} (selector '{selectors.UnfollowBtn}').", $"The Follow/Unfollow button was not found on @{username}'s page (selector '{selectors.UnfollowBtn}')."));
         }
 
         // Wait for the button to be visible and have its label rendered before reading — without
@@ -1042,7 +1042,7 @@ public sealed class PlaywrightService : IAsyncDisposable
         var before = (await button.GetAttributeAsync("aria-label")) ?? (await button.InnerTextAsync());
         if (string.IsNullOrWhiteSpace(before))
         {
-            throw new InvalidOperationException($"Nút Follow trên @{username} không load được text sau 5 giây — trang chưa render đủ. Thử lại sau.");
+            throw new InvalidOperationException(T($"Nút Follow trên @{username} không load được text sau 5 giây — trang chưa render đủ. Thử lại sau.", $"The Follow button on @{username} had no text after 5 seconds — the page has not fully rendered. Try again later."));
         }
 
         if (!before.Contains("Following", StringComparison.OrdinalIgnoreCase))
@@ -1090,8 +1090,8 @@ public sealed class PlaywrightService : IAsyncDisposable
         if (afterText.Contains("Following", StringComparison.OrdinalIgnoreCase))
         {
             var dumpPath = await TryDumpDebugStateAsync(page, $"unfollow-failed-{username}");
-            var dumpNote = dumpPath is not null ? $" Đã lưu ảnh chụp + HTML để chẩn đoán: {dumpPath}" : "";
-            throw new InvalidOperationException($"Bấm nút Unfollow nhưng @{username} vẫn đang được theo dõi (không có tác dụng thật)." + dumpNote);
+            var dumpNote = dumpPath is not null ? T($" Đã lưu ảnh chụp + HTML để chẩn đoán: {dumpPath}", $" A screenshot + HTML were saved for diagnosis: {dumpPath}") : "";
+            throw new InvalidOperationException(T($"Bấm nút Unfollow nhưng @{username} vẫn đang được theo dõi (không có tác dụng thật).", $"Clicked Unfollow but @{username} is still followed (it had no real effect).") + dumpNote);
         }
 
         return true;
@@ -1153,6 +1153,14 @@ public sealed class PlaywrightService : IAsyncDisposable
                 {
                     var response = await itemListTask;
                     var body = await response.TextAsync();
+                    if (string.IsNullOrWhiteSpace(body))
+                    {
+                        // HTTP 200 with no content: TikTok's usual way of refusing a request it considers automated /
+                        // too frequent, so it is counted separately from a real parse problem.
+                        BumpDetailStat("itemlist_empty_body (TikTok returned no content - rate limited?)");
+                        return (userId, videoCount, null, relation);
+                    }
+
                     using var itemDoc = JsonDocument.Parse(body);
                     if (itemDoc.RootElement.TryGetProperty("itemList", out var itemList) && itemList.GetArrayLength() > 0)
                     {
@@ -1289,6 +1297,14 @@ public sealed class PlaywrightService : IAsyncDisposable
                 {
                     var response = await itemListTask;
                     var body = await response.TextAsync();
+                    if (string.IsNullOrWhiteSpace(body))
+                    {
+                        // HTTP 200 with no content: TikTok's usual way of refusing a request it considers automated /
+                        // too frequent, so it is counted separately from a real parse problem.
+                        BumpDetailStat("itemlist_empty_body (TikTok returned no content - rate limited?)");
+                        return (userId, videoCount, null, relation);
+                    }
+
                     using var itemDoc = JsonDocument.Parse(body);
                     if (itemDoc.RootElement.TryGetProperty("itemList", out var itemList) && itemList.GetArrayLength() > 0)
                     {
@@ -1415,7 +1431,7 @@ public sealed class PlaywrightService : IAsyncDisposable
     {
         if (_page is null)
         {
-            throw new InvalidOperationException("Playwright chưa được khởi động — gọi LaunchAsync trước.");
+            throw new InvalidOperationException(T("Playwright chưa được khởi động — gọi LaunchAsync trước.", "Playwright has not been started — call LaunchAsync first."));
         }
     }
 

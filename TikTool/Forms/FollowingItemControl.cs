@@ -209,8 +209,6 @@ public sealed class FollowingItemControl : Guna2Panel
         _avatarShown = true;
     }
 
-    private static string T(string vi, string _en) => vi; // stub — theo pattern của UnfollowPage
-
     /// <summary>Called after an async video-count check or unfollow attempt updates the
     /// underlying <see cref="FollowingAccount"/> — repaints the meta line and status badge.</summary>
     public void RefreshStatus()
@@ -225,28 +223,36 @@ public sealed class FollowingItemControl : Guna2Panel
 
     private string BuildMetaText()
     {
+        // Mutual follows are protected by the SkipFriends setting, so show why such a row is never unfollowed.
+        var friend = Account.IsFriend ? T(" · 🤝 Bạn bè", " · 🤝 Friend") : "";
+
         if (Account.VideoCount < 0)
         {
-            return $"@{Account.Username} · chưa kiểm tra";
+            return $"@{Account.Username} · {T("chưa kiểm tra", "not checked")}{friend}";
         }
 
         if (Account.VideoCount == 0)
         {
-            return $"@{Account.Username} · chưa từng đăng video";
+            return $"@{Account.Username} · {T("không có video", "no videos")}{friend}";
         }
 
         var activityPart = Account.DaysSinceLastPost is int days
-            ? $"{Account.VideoCount} video · đăng gần nhất {days} ngày trước"
-            : $"{Account.VideoCount} video";
-        return $"@{Account.Username} · {activityPart}";
+            ? T($"{Account.VideoCount} video · đăng gần nhất {days} ngày trước", $"{Account.VideoCount} videos · last post {days} days ago")
+            : T($"{Account.VideoCount} video", $"{Account.VideoCount} videos");
+        return $"@{Account.Username} · {activityPart}{friend}";
     }
 
+    // "0 videos" is not the same as "dead": the account can be a real person (even a mutual friend) or a creator
+    // who removed/hid their videos, so the badge says what is known instead of calling it dead.
     private string BadgeText() => Account.Status switch
     {
-        UnfollowStatus.Unfollowing => "Đang xử lý...",
-        UnfollowStatus.Done => "✓ Đã unfollow",
-        UnfollowStatus.Failed => "✗ Lỗi",
-        _ => Account.VideoCount < 0 ? "Chưa kiểm tra" : Account.IsDead ? "💀 Kênh chết" : "Đang hoạt động",
+        UnfollowStatus.Unfollowing => T("Đang xử lý...", "Working..."),
+        UnfollowStatus.Done => T("✓ Đã unfollow", "✓ Unfollowed"),
+        UnfollowStatus.Failed => T("✗ Lỗi", "✗ Error"),
+        _ => Account.VideoCount < 0 ? T("Chưa kiểm tra", "Not checked")
+            : Account.VideoCount == 0 ? T("Không có video", "No videos")
+            : Account.IsDead ? T("Lâu không đăng", "Inactive")
+            : T("Đang hoạt động", "Active"),
     };
 
     private Color BadgeColor() => Account.Status switch

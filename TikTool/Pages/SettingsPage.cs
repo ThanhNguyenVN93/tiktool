@@ -180,7 +180,7 @@ internal sealed class SettingsPage : UserControl
         };
         var btnChoose = new Guna2Button
         {
-            Text = "Chọn...",
+            Text = T("Chọn...", "Browse..."),
             Font = Theme.FontMedium,
             Size = new Size(80, 28),
             FillColor = ColorTranslator.FromHtml("#1a1a1a"),
@@ -239,7 +239,7 @@ internal sealed class SettingsPage : UserControl
 
         var waitControl = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false };
         waitControl.Controls.Add(_rateLimitWaitNumeric);
-        waitControl.Controls.Add(new Label { Text = "giây", ForeColor = Theme.TextMuted, AutoSize = true, Margin = new Padding(4, 6, 0, 0) });
+        waitControl.Controls.Add(new Label { Text = T("giây", "seconds"), ForeColor = Theme.TextMuted, AutoSize = true, Margin = new Padding(4, 6, 0, 0) });
 
         return new List<Control>
         {

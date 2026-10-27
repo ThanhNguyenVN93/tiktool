@@ -19,10 +19,10 @@ internal static class Program
 
         var splash = new SplashForm();
         splash.Show();
-        splash.Status = "Đang khởi động...";
+        splash.Status = T("Đang khởi động...", "Starting...");
         Application.DoEvents(); // render splash trước khi MainForm constructor chạy
 
-        splash.Status = "Đang khởi tạo dịch vụ...";
+        splash.Status = T("Đang khởi tạo dịch vụ...", "Initializing services...");
         Application.DoEvents();
 
         var main = new Forms.MainForm();

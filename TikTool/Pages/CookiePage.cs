@@ -573,7 +573,7 @@ internal sealed class CookiePage : UserControl
 
             return cookie;
         }
-        catch (InvalidOperationException ex) when (allowKillRetry && ex.Message.Contains("đang khóa file cookie"))
+        catch (CookieFileLockedException ex) when (allowKillRetry)
         {
             _log.Log($"[Cookie] {ex.Message}", LogLevel.Warn);
 
@@ -668,7 +668,7 @@ internal sealed class CookiePage : UserControl
         }
         catch (Exception ex)
         {
-            _log.Log($"[Login] Lỗi: {ex.Message}", LogLevel.Error);
+            _log.Log(T($"[Login] Lỗi: {ex.Message}", $"[Login] Error: {ex.Message}"), LogLevel.Error);
         }
         finally
         {

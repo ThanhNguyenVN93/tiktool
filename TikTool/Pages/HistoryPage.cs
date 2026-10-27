@@ -439,7 +439,7 @@ internal sealed class HistoryPage : UserControl
         if (dialog.ShowDialog() != DialogResult.OK) return;
 
         File.WriteAllText(dialog.FileName, _historyService.ExportCsv());
-        MessageBox.Show($"Đã xuất {dialog.FileName}", "Social Toolkit", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        MessageBox.Show(T($"Đã xuất {dialog.FileName}", $"Exported {dialog.FileName}"), "Social Toolkit", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 
     private void ExportUnfollowCsv()
@@ -469,5 +469,4 @@ internal sealed class HistoryPage : UserControl
     private static string CsvEscape(string value) =>
         value.Contains(',') || value.Contains('"') ? $"\"{value.Replace("\"", "\"\"")}\"" : value;
 
-    private static string T(string vi, string _en) => vi;
 }

@@ -73,10 +73,7 @@ public sealed class MainForm : Form
 
         RegisterPage("download", new DownloadPage(ytDlpService, historyService, settingsService, cookieService));
         RegisterPage(TikTokUnfollowKey, new UnfollowPage(playwrightService, tikTokApiService, cookieService, settingsService, historyService, sessionStateService));
-        RegisterPage(YouTubeUnsubKey, new PlaceholderPage(
-            "YouTube Unsubscribe",
-            T("Sắp có — hủy đăng ký các kênh YouTube lâu không đăng video.",
-              "Coming soon — unsubscribe from YouTube channels that stopped uploading.")));
+        RegisterPage(YouTubeUnsubKey, new YouTubeProbePage());
         var cookiePage = new CookiePage(cookieService, playwrightService);
         cookiePage.CookieStatusChanged += () => _ = RefreshFooterAsync();
         RegisterPage("cookie", cookiePage);
@@ -111,9 +108,9 @@ public sealed class MainForm : Form
     private void InitTrayIcon()
     {
         var menu = new ContextMenuStrip();
-        menu.Items.Add("Mở Social Toolkit", null, (_, _) => RestoreFromTray());
+        menu.Items.Add(T("Mở Social Toolkit", "Open Social Toolkit"), null, (_, _) => RestoreFromTray());
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Thoát", null, (_, _) => { _trayIcon!.Visible = false; Application.Exit(); });
+        menu.Items.Add(T("Thoát", "Exit"), null, (_, _) => { _trayIcon!.Visible = false; Application.Exit(); });
 
         _trayIcon = new NotifyIcon
         {
@@ -139,7 +136,7 @@ public sealed class MainForm : Form
             e.Cancel = true;
             Hide();
             _trayIcon!.Visible = true;
-            _trayIcon.ShowBalloonTip(2000, "Social Toolkit", "Ứng dụng vẫn đang chạy trong khay hệ thống.", ToolTipIcon.Info);
+            _trayIcon.ShowBalloonTip(2000, "Social Toolkit", T("Ứng dụng vẫn đang chạy trong khay hệ thống.", "The app is still running in the system tray."), ToolTipIcon.Info);
             return;
         }
 
@@ -420,7 +417,7 @@ public sealed class MainForm : Form
         }
         catch
         {
-            SetFooterRow(_lblYtDlp, _dotYtDlp, "yt-dlp chưa cài", Theme.Orange);
+            SetFooterRow(_lblYtDlp, _dotYtDlp, T("yt-dlp chưa cài", "yt-dlp not installed"), Theme.Orange);
         }
 
         // Chrome
@@ -454,7 +451,7 @@ public sealed class MainForm : Form
         }
         catch
         {
-            SetFooterRow(_lblCookie, _dotCookie, "Cookie chưa xác thực", Theme.TextMuted);
+            SetFooterRow(_lblCookie, _dotCookie, T("Cookie chưa xác thực", "Cookie not verified"), Theme.TextMuted);
         }
     }
 

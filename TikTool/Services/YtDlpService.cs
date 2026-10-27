@@ -166,7 +166,7 @@ public sealed class YtDlpService
             }
         }
 
-        throw lastError ?? new InvalidOperationException("Download thất bại không rõ lý do");
+        throw lastError ?? new InvalidOperationException(T("Download thất bại không rõ lý do", "Download failed for an unknown reason"));
     }
 
     private async Task RunDownloadAsync(DownloadItem item, IProgress<DownloadProgressInfo> progress, string? rawCookieString, CancellationToken ct)
@@ -213,7 +213,7 @@ public sealed class YtDlpService
         catch (System.ComponentModel.Win32Exception)
         {
             throw new InvalidOperationException(
-                "Không tìm thấy yt-dlp.exe. Hãy đặt file yt-dlp.exe vào thư mục cài đặt Social Toolkit (Resources\\yt-dlp.exe) hoặc thêm vào PATH.");
+                T("Không tìm thấy yt-dlp.exe. Hãy đặt file yt-dlp.exe vào thư mục cài đặt Social Toolkit (Resources\\yt-dlp.exe) hoặc thêm vào PATH.", "yt-dlp.exe was not found. Put yt-dlp.exe in the Social Toolkit install folder (Resources\\yt-dlp.exe) or add it to PATH."));
         }
 
         process.BeginOutputReadLine();
@@ -231,7 +231,7 @@ public sealed class YtDlpService
 
         if (process.ExitCode != 0)
         {
-            var reason = errorLines.Count > 0 ? errorLines[^1] : $"yt-dlp thoát với mã lỗi {process.ExitCode}";
+            var reason = errorLines.Count > 0 ? errorLines[^1] : T($"yt-dlp thoát với mã lỗi {process.ExitCode}", $"yt-dlp exited with error code {process.ExitCode}");
             throw new InvalidOperationException(reason);
         }
     }

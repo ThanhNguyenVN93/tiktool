@@ -133,7 +133,7 @@ internal sealed class UnfollowPage : UserControl
 
         var title = new Label
         {
-            Text = T("Bỏ Theo Dõi Kênh Chết", "Unfollow Dead Channels"),
+            Text = T("Bỏ Theo Dõi Kênh Không Hoạt Động", "Unfollow Inactive Channels"),
             Font = new Font("Segoe UI", 12f, FontStyle.Bold),
             ForeColor = Color.White,
             AutoSize = true,
@@ -225,7 +225,7 @@ internal sealed class UnfollowPage : UserControl
 
         var criteriaLabel = new Label
         {
-            Text = T("Tiêu chí kênh chết", "Dead channel criteria"),
+            Text = T("Tiêu chí kênh không hoạt động", "Inactive channel criteria"),
             Font = Theme.FontLabel,
             ForeColor = ColorTranslator.FromHtml("#444444"),
             AutoSize = true,
@@ -309,7 +309,7 @@ internal sealed class UnfollowPage : UserControl
         // Index order must match GetVisibleAccounts.
         _viewCombo = MakeCombo(0,
             T("Tất cả kênh", "All channels"),
-            T("Chỉ kênh chết", "Dead only"),
+            T("Chỉ kênh không hoạt động", "Inactive only"),
             T("Chỉ kênh còn hoạt động", "Active only"),
             T("Chỉ kênh đã chọn", "Selected only"));
         _sortCombo = MakeCombo(third,
@@ -371,10 +371,10 @@ internal sealed class UnfollowPage : UserControl
 
         _btnSelectDead = new Guna2Button
         {
-            Text = T("☠  Chọn kênh chết", "☠  Select dead"),
+            Text = T("💤  Chọn không hoạt động", "💤  Select inactive"),
             Font = Theme.FontMedium,
-            Size = new Size(150, 28),
-            Location = new Point(ContentWidth - 258, 0),
+            Size = new Size(160, 28),
+            Location = new Point(ContentWidth - 268, 0),
             FillColor = ColorTranslator.FromHtml("#1a1a1a"),
             ForeColor = Theme.TextSecondary,
             BorderRadius = 7,
@@ -387,7 +387,7 @@ internal sealed class UnfollowPage : UserControl
             Text = T("☑  Chọn tất cả đang hiện", "☑  Select all shown"),
             Font = Theme.FontMedium,
             Size = new Size(170, 28),
-            Location = new Point(ContentWidth - 258 - 8 - 170, 0),
+            Location = new Point(ContentWidth - 268 - 8 - 170, 0),
             FillColor = ColorTranslator.FromHtml("#1a1a1a"),
             ForeColor = Theme.TextSecondary,
             BorderRadius = 7,
@@ -577,8 +577,8 @@ internal sealed class UnfollowPage : UserControl
             {
                 var unknownDate = _accounts.Count(a => a.VideoCount > 0 && a.LastPostUnixSeconds == null);
                 if (unknownDate > 0)
-                    _log.Log(T($"[Unfollow] ⚠ {unknownDate} kênh có video nhưng không lấy được ngày đăng gần nhất — sẽ không bị tính là kênh chết theo tiêu chí ngày. Bấm nút 'Kiểm tra ngày' ở thanh dưới để lấy dần (từng đợt nhỏ, an toàn).",
-                               $"[Unfollow] ⚠ {unknownDate} accounts have videos but last-post date is unknown — they won't be auto-marked dead by the day threshold. Use the 'Check dates' button below to read them in small, safe batches."),
+                    _log.Log(T($"[Unfollow] ⚠ {unknownDate} kênh có video nhưng không lấy được ngày đăng gần nhất — sẽ không bị tính là không hoạt động theo tiêu chí ngày. Bấm nút 'Kiểm tra ngày' ở thanh dưới để lấy dần (từng đợt nhỏ, an toàn).",
+                               $"[Unfollow] ⚠ {unknownDate} accounts have videos but last-post date is unknown — they won't be marked inactive by the day threshold. Use the 'Check dates' button below to read them in small, safe batches."),
                         LogLevel.Warn);
             }
 
@@ -587,8 +587,8 @@ internal sealed class UnfollowPage : UserControl
 
             RebuildList();
             StartAvatarDownloads();
-            _log.Log(T($"[Unfollow] Hoàn tất — {_accounts.Count(a => a.IsDead)} kênh chết / {_accounts.Count} tổng.",
-                        $"[Unfollow] Done — {_accounts.Count(a => a.IsDead)} dead / {_accounts.Count} total."), LogLevel.Ok);
+            _log.Log(T($"[Unfollow] Hoàn tất — {_accounts.Count(a => a.IsDead)} kênh không hoạt động / {_accounts.Count} tổng.",
+                        $"[Unfollow] Done — {_accounts.Count(a => a.IsDead)} inactive / {_accounts.Count} total."), LogLevel.Ok);
         }
         catch (Exception ex)
         {
@@ -705,7 +705,7 @@ internal sealed class UnfollowPage : UserControl
                     else
                     {
                         nullStreak++;
-                        _log.Log($"[Unfollow] Không đọc được @{account.Username} (thử mở: https://www.tiktok.com/@{account.Username})", LogLevel.Warn);
+                        _log.Log(T($"[Unfollow] Không đọc được @{account.Username} (thử mở: https://www.tiktok.com/@{account.Username})", $"[Unfollow] Could not read @{account.Username} (try opening: https://www.tiktok.com/@{account.Username})"), LogLevel.Warn);
                     }
 
                     current = ++done;
@@ -752,7 +752,8 @@ internal sealed class UnfollowPage : UserControl
     // unattended for ~500 accounts. So it is a separate, opt-in button that works in small, slow
     // batches (results cached on disk) and stops the moment TikTok starts refusing pages.
     private const int MaxDateChecksPerRun = 120;
-    private const int DateCheckConcurrency = 2;
+    private const int DateCheckConcurrency = 1;
+    private const int DateCheckEmptyStreak = 4; // profiles that read fine but yield no date, in a row
     private const int DateCheckBlockStreak = 5;
     private readonly SemaphoreSlim _dateCheckGate = new(DateCheckConcurrency, DateCheckConcurrency);
 
@@ -794,6 +795,8 @@ internal sealed class UnfollowPage : UserControl
         var done = 0;
         var failStreak = 0;
         var blocked = false;
+        var stalled = false;
+        var noDateStreak = 0;
         var gotDate = 0;
 
         try
@@ -808,7 +811,7 @@ internal sealed class UnfollowPage : UserControl
                 await _dateCheckGate.WaitAsync(ct);
                 try
                 {
-                    if (blocked) return;
+                    if (blocked || stalled) return;
                     ct.ThrowIfCancellationRequested();
 
                     var detail = await _playwright.GetUserDetailParallelAsync(account.Username, ct);
@@ -826,6 +829,13 @@ internal sealed class UnfollowPage : UserControl
                             {
                                 _dateCache.Set(account.Username, d.VideoCount, ts);
                                 gotDate++;
+                                noDateStreak = 0;
+                            }
+                            else if (d.VideoCount > 0 && ++noDateStreak >= DateCheckEmptyStreak)
+                            {
+                                // The profile read fine but its video list keeps coming back empty: TikTok is throttling
+                                // this endpoint. Carrying on only burns requests (and risks a real block), so stop.
+                                stalled = true;
                             }
 
                             failStreak = 0;
@@ -844,7 +854,7 @@ internal sealed class UnfollowPage : UserControl
                                    $"[Unfollow] Checked {current}/{targets.Count} accounts ({gotDate} with a date)..."), LogLevel.Info);
                     }
 
-                    await Task.Delay(Random.Shared.Next(1500, 3000), ct);
+                    await Task.Delay(Random.Shared.Next(3000, 5000), ct);
                 }
                 finally
                 {
@@ -854,7 +864,12 @@ internal sealed class UnfollowPage : UserControl
 
             await Task.WhenAll(tasks);
 
-            if (blocked)
+            if (stalled)
+            {
+                _log.Log(T($"[Unfollow] ⚠ TikTok đang trả danh sách video rỗng (có vẻ đang giới hạn tốc độ) — đã dừng để tránh bị chặn. Đã lưu {gotDate} ngày; đợi một lúc rồi bấm lại.",
+                           $"[Unfollow] ⚠ TikTok is returning empty video lists (looks like rate limiting) — stopped to avoid a block. {gotDate} dates were saved; wait a while and click again."), LogLevel.Warn);
+            }
+            else if (blocked)
             {
                 _log.Log(T("[Unfollow] ⚠ TikTok có vẻ đang chặn (nhiều kênh liên tiếp không đọc được) — đã dừng. Phần đã lấy được đã lưu; đợi một lúc rồi bấm lại.",
                            "[Unfollow] ⚠ TikTok seems to be blocking (several accounts in a row unreadable) — stopped. What was read is saved; wait a while then try again."), LogLevel.Warn);
@@ -1060,8 +1075,8 @@ internal sealed class UnfollowPage : UserControl
         var extras = new System.Text.StringBuilder();
         if (whitelistCount > 0) extras.Append(T($", bỏ qua {whitelistCount} whitelist", $", {whitelistCount} whitelisted skipped"));
         if (friendCount > 0)    extras.Append(T($", bỏ qua {friendCount} follow lại", $", {friendCount} mutual skipped"));
-        _log.Log(T($"[Unfollow] Đã chọn {selectedCount} kênh chết{extras}.",
-                   $"[Unfollow] Selected {selectedCount} dead channels{extras}."), LogLevel.Info);
+        _log.Log(T($"[Unfollow] Đã chọn {selectedCount} kênh không hoạt động{extras}.",
+                   $"[Unfollow] Selected {selectedCount} inactive channels{extras}."), LogLevel.Info);
     }
 
     private void ClearSelection()
@@ -1074,6 +1089,44 @@ internal sealed class UnfollowPage : UserControl
         RebuildList();
     }
 
+    /// <summary>Last chance before an irreversible-ish action: says how many channels will be unfollowed, how many of
+    /// them are NOT dead (still active), a few names to sanity-check, and the daily allowance. Defaults to "No".</summary>
+    private bool ConfirmUnfollow(List<FollowingAccount> selected, int remainingQuota, int friendsSkipped)
+    {
+        var alive = selected.Count(a => !a.IsDead);
+        var dead = selected.Count - alive;
+        var sample = string.Join(", ", selected.Take(5).Select(a => "@" + a.Username)) + (selected.Count > 5 ? ", ..." : "");
+
+        var vi = new System.Text.StringBuilder();
+        vi.AppendLine($"Bạn sắp bỏ theo dõi {selected.Count} kênh:");
+        vi.AppendLine($"  • {dead} kênh không hoạt động");
+        if (alive > 0) vi.AppendLine($"  • {alive} kênh CÒN HOẠT ĐỘNG (không thuộc diện không hoạt động)");
+        if (friendsSkipped > 0) vi.AppendLine($"  (đã bỏ qua {friendsSkipped} bạn bè theo dõi lại bạn)");
+        vi.AppendLine();
+        vi.AppendLine($"Ví dụ: {sample}");
+        vi.AppendLine($"Lượt còn lại hôm nay: {remainingQuota}.");
+        vi.AppendLine();
+        vi.Append("Muốn theo dõi lại phải vào từng kênh bấm tay (xem tab Lịch sử). Tiếp tục?");
+
+        var en = new System.Text.StringBuilder();
+        en.AppendLine($"You are about to unfollow {selected.Count} channels:");
+        en.AppendLine($"  • {dead} inactive channels");
+        if (alive > 0) en.AppendLine($"  • {alive} channels that are STILL ACTIVE (not inactive)");
+        if (friendsSkipped > 0) en.AppendLine($"  ({friendsSkipped} mutual friends were skipped)");
+        en.AppendLine();
+        en.AppendLine($"For example: {sample}");
+        en.AppendLine($"Unfollows left today: {remainingQuota}.");
+        en.AppendLine();
+        en.Append("Following them again means doing it by hand, one by one (see the History tab). Continue?");
+
+        var answer = MessageBox.Show(
+            T(vi.ToString(), en.ToString()),
+            T("Social Toolkit — Xác nhận bỏ theo dõi", "Social Toolkit — Confirm unfollow"),
+            MessageBoxButtons.YesNo,
+            alive > 0 ? MessageBoxIcon.Warning : MessageBoxIcon.Question,
+            MessageBoxDefaultButton.Button2);
+        return answer == DialogResult.Yes;
+    }
     private async Task StartOrStopUnfollowAsync()
     {
         if (_isBusy)
@@ -1122,6 +1175,15 @@ internal sealed class UnfollowPage : UserControl
         {
             _log.Log(T($"[Unfollow] Giới hạn phiên/ngày: {sessionLimit} tài khoản — {skippedByLimit} tài khoản còn lại sẽ chờ lần chạy sau.",
                         $"[Unfollow] Session/day limit: {sessionLimit} accounts — {skippedByLimit} remaining will wait for next run."), LogLevel.Warn);
+        }
+
+        var friendsSkipped = settings.SkipFriends
+            ? _accounts.Count(a => a.IsSelected && a.IsFriend && !a.IsWhitelisted && a.Status != UnfollowStatus.Done)
+            : 0;
+        if (!ConfirmUnfollow(selected, remainingQuota, friendsSkipped))
+        {
+            _log.Log(T("[Unfollow] Đã hủy — chưa bỏ theo dõi kênh nào.", "[Unfollow] Cancelled — nothing was unfollowed."), LogLevel.Info);
+            return;
         }
 
         var cookie = await _cookieService.LoadCookieAsync();
@@ -1207,7 +1269,7 @@ internal sealed class UnfollowPage : UserControl
                     {
                         Type = "Unfollow",
                         Title = $"@{account.Username}",
-                        Detail = account.VideoCount == 0 ? T("Kênh chết (0 video)", "Dead channel (0 videos)") : $"{account.VideoCount} video",
+                        Detail = account.VideoCount == 0 ? T("Không có video", "No videos") : $"{account.VideoCount} video",
                         Success = true,
                     });
 
@@ -1293,8 +1355,8 @@ internal sealed class UnfollowPage : UserControl
         var dead = _accounts.Count(a => a.IsDead);
         var showing = shown >= 0 && shown != _accounts.Count;
         _sectionLabel.Text = T(
-            $"{_accounts.Count} kênh theo dõi · {dead} kênh chết" + (showing ? $" · hiện {shown}" : ""),
-            $"{_accounts.Count} following · {dead} dead" + (showing ? $" · showing {shown}" : ""));
+            $"{_accounts.Count} kênh theo dõi · {dead} không hoạt động" + (showing ? $" · hiện {shown}" : ""),
+            $"{_accounts.Count} following · {dead} inactive" + (showing ? $" · showing {shown}" : ""));
     }
 
     private void UpdateActionInfo()
@@ -1319,7 +1381,7 @@ internal sealed class UnfollowPage : UserControl
     private void UpdateHeaderBadge()
     {
         var dead = _accounts.Count(a => a.IsDead);
-        _headerBadge.Text = _accounts.Count == 0 ? T("Cần cookie", "Cookie needed") : T($"{dead} kênh chết / {_accounts.Count}", $"{dead} dead / {_accounts.Count}");
+        _headerBadge.Text = _accounts.Count == 0 ? T("Cần cookie", "Cookie needed") : T($"{dead} không hoạt động / {_accounts.Count}", $"{dead} inactive / {_accounts.Count}");
         _headerBadge.ForeColor = dead > 0 ? Theme.Orange : Theme.TextMuted;
     }
 }

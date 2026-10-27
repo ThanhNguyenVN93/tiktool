@@ -42,7 +42,7 @@ internal sealed class SplashForm : Form
         // — Dòng trạng thái —
         _lblStatus = new Label
         {
-            Text      = "Đang khởi động...",
+            Text      = T("Đang khởi động...", "Starting..."),
             Font      = new Font("Segoe UI", 8),
             ForeColor = Theme.TextMuted,
             AutoSize  = true,

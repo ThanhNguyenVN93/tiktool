@@ -139,8 +139,9 @@ public sealed class CookieService
 
         if (lockedAny)
         {
-            throw new InvalidOperationException(
-                $"{browserName} đang khóa file cookie ở (ít nhất) 1 profile. Hãy đóng hoàn toàn {browserName} (kể cả icon khay hệ thống) rồi thử lại.");
+            throw new CookieFileLockedException(
+                T($"{browserName} đang khóa file cookie ở (ít nhất) 1 profile. Hãy đóng hoàn toàn {browserName} (kể cả icon khay hệ thống) rồi thử lại.",
+                  $"{browserName} has the cookie file locked in at least one profile. Close {browserName} completely (including its system tray icon) and try again."));
         }
 
         return null;
@@ -224,7 +225,7 @@ public sealed class CookieService
         var json = ReadLockedTextFile(localStatePath);
         using var doc = JsonDocument.Parse(json);
         var encryptedKeyB64 = doc.RootElement.GetProperty("os_crypt").GetProperty("encrypted_key").GetString()
-            ?? throw new InvalidOperationException("Local State không chứa os_crypt.encrypted_key");
+            ?? throw new InvalidOperationException(T("Local State không chứa os_crypt.encrypted_key", "Local State does not contain os_crypt.encrypted_key"));
 
         var encryptedKey = Convert.FromBase64String(encryptedKeyB64);
         // Strip the leading "DPAPI" (5-byte ASCII) prefix Chrome adds before the DPAPI blob.
@@ -321,7 +322,7 @@ public sealed class CookieService
 
         if (!values.TryGetValue("sessionid", out var sessionId) || string.IsNullOrWhiteSpace(sessionId))
         {
-            throw new InvalidOperationException("Chuỗi cookie không chứa 'sessionid'. Kiểm tra lại nội dung đã copy.");
+            throw new InvalidOperationException(T("Chuỗi cookie không chứa 'sessionid'. Kiểm tra lại nội dung đã copy.", "The cookie string does not contain 'sessionid'. Check what you copied."));
         }
 
         return new TikTokCookie
@@ -352,7 +353,7 @@ public sealed class CookieService
 
             if (!response.IsSuccessStatusCode)
             {
-                return CookieVerifyResult.Fail($"HTTP {(int)response.StatusCode} từ TikTok");
+                return CookieVerifyResult.Fail(T($"HTTP {(int)response.StatusCode} từ TikTok", $"HTTP {(int)response.StatusCode} from TikTok"));
             }
 
             using var doc = JsonDocument.Parse(body);
@@ -368,11 +369,11 @@ public sealed class CookieService
                 }
             }
 
-            return CookieVerifyResult.Fail("Cookie không hợp lệ hoặc đã hết hạn đăng nhập");
+            return CookieVerifyResult.Fail(T("Cookie không hợp lệ hoặc đã hết hạn đăng nhập", "The cookie is invalid or the login has expired"));
         }
         catch (Exception ex)
         {
-            return CookieVerifyResult.Fail($"Không thể kết nối TikTok: {ex.Message}");
+            return CookieVerifyResult.Fail(T($"Không thể kết nối TikTok: {ex.Message}", $"Could not connect to TikTok: {ex.Message}"));
         }
     }
 
@@ -432,4 +433,13 @@ public sealed class CookieVerifyResult
         IsValid = false,
         Error = error,
     };
+}
+
+/// <summary>Raised when the browser has the cookie database locked. A dedicated type so callers react to it directly instead of
+/// searching the (translated) message text.</summary>
+public sealed class CookieFileLockedException : InvalidOperationException
+{
+    public CookieFileLockedException(string message) : base(message)
+    {
+    }
 }
