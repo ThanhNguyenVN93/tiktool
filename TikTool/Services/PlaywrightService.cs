@@ -1111,8 +1111,8 @@ public sealed class PlaywrightService : IAsyncDisposable
     /// timestamp comes from PASSIVELY intercepting the `api/post/item_list/` response that the
     /// profile page's OWN client-side code fires to render its video grid — confirmed live that
     /// this genuine, page-triggered call *does* carry a working signature (unlike anything we
-    /// issue ourselves), and `itemList[0].createTime` (unix seconds) is the newest video's post
-    /// time under the default "Latest" sort. Returns null on any failure (private/deleted
+    /// issue ourselves), and the NEWEST `createTime` (unix seconds) in the returned page is the latest post
+    /// time (NOT `itemList[0]`: pinned posts are listed first and are old on purpose). Returns null on any failure (private/deleted
     /// account, selector/schema drift, etc.); caller treats that as "unknown", never as "dead".
     /// LastPostUnixSeconds specifically stays null when the account has videos but the
     /// intercept simply didn't arrive in time (slow network) — never guessed from partial data.</summary>
@@ -1156,7 +1156,7 @@ public sealed class PlaywrightService : IAsyncDisposable
                     using var itemDoc = JsonDocument.Parse(body);
                     if (itemDoc.RootElement.TryGetProperty("itemList", out var itemList) && itemList.GetArrayLength() > 0)
                     {
-                        lastPostUnixSeconds = itemList[0].GetProperty("createTime").GetInt64();
+                        lastPostUnixSeconds = NewestCreateTime(itemList);
                     }
                 }
                 catch
@@ -1192,6 +1192,8 @@ public sealed class PlaywrightService : IAsyncDisposable
     private static async Task<(string UserId, int VideoCount, long? LastPostUnixSeconds, int Relation)?> GetUserDetailOnPageAsync(
         IPage page, string username, CancellationToken ct)
     {
+        JsonDocument? hydrationDoc = null;
+        JsonDocument? apiDoc = null;
         try
         {
             var itemListTask = page.WaitForResponseAsync(
@@ -1201,22 +1203,78 @@ public sealed class PlaywrightService : IAsyncDisposable
             // unobserved task exception.
             _ = itemListTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
 
+            // The page's own user/detail request (it carries a valid signature) is a second source for the
+            // same data, used when the embedded page data is missing.
+            var detailApiTask = page.WaitForResponseAsync(
+                r => r.Url.Contains("/api/user/detail/") && r.Ok,
+                new PageWaitForResponseOptions { Timeout = 15_000 });
+            _ = detailApiTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
+
             await page.GotoAsync($"https://www.tiktok.com/@{username}", new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded });
             ct.ThrowIfCancellationRequested();
 
-            var raw = await page.EvaluateAsync<string?>(
-                "document.getElementById('__UNIVERSAL_DATA_FOR_REHYDRATION__')?.textContent ?? null");
+            JsonElement userInfo = default;
+            var haveUserInfo = false;
+
+            var raw = await ReadHydrationAsync(page);
             if (string.IsNullOrEmpty(raw))
             {
-                BumpDetailStat("raw_null (no hydration data - error/blocked page?)");
-                return null;
+                // Seen live: the data script is sometimes not in the first HTML (client-rendered shell), so
+                // read-immediately returned nothing for some accounts. Give the page a few seconds to produce it.
+                try
+                {
+                    await page.WaitForFunctionAsync(
+                        "() => !!document.getElementById('__UNIVERSAL_DATA_FOR_REHYDRATION__')",
+                        null,
+                        new PageWaitForFunctionOptions { Timeout = 6_000 });
+                }
+                catch
+                {
+                    // still absent - fall through to the API response below
+                }
+
+                raw = await ReadHydrationAsync(page);
             }
 
-            using var doc = JsonDocument.Parse(raw);
-            var userInfo = doc.RootElement
-                .GetProperty("__DEFAULT_SCOPE__")
-                .GetProperty("webapp.user-detail")
-                .GetProperty("userInfo");
+            if (!string.IsNullOrEmpty(raw))
+            {
+                try
+                {
+                    hydrationDoc = JsonDocument.Parse(raw);
+                    userInfo = hydrationDoc.RootElement
+                        .GetProperty("__DEFAULT_SCOPE__")
+                        .GetProperty("webapp.user-detail")
+                        .GetProperty("userInfo");
+                    haveUserInfo = true;
+                    BumpDetailStat("detail_from_page_data");
+                }
+                catch
+                {
+                    // page data present but not the expected shape - try the API response
+                }
+            }
+
+            if (!haveUserInfo)
+            {
+                try
+                {
+                    var detailResponse = await detailApiTask;
+                    apiDoc = JsonDocument.Parse(await detailResponse.TextAsync());
+                    userInfo = apiDoc.RootElement.GetProperty("userInfo");
+                    haveUserInfo = true;
+                    BumpDetailStat("detail_from_api_fallback");
+                }
+                catch
+                {
+                    // neither source worked
+                }
+            }
+
+            if (!haveUserInfo)
+            {
+                BumpDetailStat("no_profile_data (neither page data nor user/detail response)");
+                return null;
+            }
 
             var userEl2   = userInfo.GetProperty("user");
             var userId    = userEl2.GetProperty("id").GetString() ?? "";
@@ -1234,8 +1292,20 @@ public sealed class PlaywrightService : IAsyncDisposable
                     using var itemDoc = JsonDocument.Parse(body);
                     if (itemDoc.RootElement.TryGetProperty("itemList", out var itemList) && itemList.GetArrayLength() > 0)
                     {
-                        lastPostUnixSeconds = itemList[0].GetProperty("createTime").GetInt64();
-                        BumpDetailStat("date_ok");
+                        lastPostUnixSeconds = NewestCreateTime(itemList);
+                        if (lastPostUnixSeconds is null)
+                        {
+                            // Items came back but none carried a usable createTime - record what they look like.
+                            var first = itemList[0];
+                            var keys = first.ValueKind == JsonValueKind.Object
+                                ? string.Join(",", first.EnumerateObject().Select(x => x.Name).Take(14))
+                                : first.ValueKind.ToString();
+                            BumpDetailStat($"itemlist_without_createTime (items={itemList.GetArrayLength()}, first item keys=[{keys}])");
+                        }
+                        else
+                        {
+                            BumpDetailStat("date_ok");
+                        }
                     }
                     else
                     {
@@ -1264,8 +1334,34 @@ public sealed class PlaywrightService : IAsyncDisposable
             BumpDetailStat("profile_failed: " + ex.GetType().Name + " - " + ex.Message.Split('\n')[0]);
             return null;
         }
+        finally
+        {
+            hydrationDoc?.Dispose();
+            apiDoc?.Dispose();
+        }
     }
 
+    private static Task<string?> ReadHydrationAsync(IPage page) =>
+        page.EvaluateAsync<string?>("document.getElementById('__UNIVERSAL_DATA_FOR_REHYDRATION__')?.textContent ?? null");
+
+    /// <summary>Newest createTime across a page of posts. The first item can be a PINNED post, which is old by
+    /// design, so the latest post is the maximum over the page, not the first element.</summary>
+    private static long? NewestCreateTime(JsonElement itemList)
+    {
+        long? newest = null;
+        foreach (var item in itemList.EnumerateArray())
+        {
+            if (item.TryGetProperty("createTime", out var ct)
+                && ct.ValueKind == JsonValueKind.Number
+                && ct.TryGetInt64(out var value)
+                && (newest is null || value > newest))
+            {
+                newest = value;
+            }
+        }
+
+        return newest;
+    }
     private static readonly ConcurrentDictionary<string, int> DetailStats = new();
 
     private static void BumpDetailStat(string key) => DetailStats.AddOrUpdate(key, 1, (_, c) => c + 1);
