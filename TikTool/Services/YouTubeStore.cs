@@ -13,7 +13,11 @@ internal sealed class YouTubeStore
         public long? LastUploadUnix { get; set; }
         public string Text { get; set; } = "";
         public bool NoVideos { get; set; }
+        public bool HasShorts { get; set; }
         public long CheckedAtUnix { get; set; }
+
+        /// <summary>2 = read together with the Shorts-tab check; older readings are re-read.</summary>
+        public int Version { get; set; }
     }
 
     // YouTube only gives a coarse age ("3y ago"), so a week-old reading is still good enough for an inactivity check.
@@ -61,6 +65,7 @@ internal sealed class YouTubeStore
         lock (_gate)
         {
             if (_ages.TryGetValue(url, out var e)
+                && e.Version >= 2
                 && DateTimeOffset.UtcNow - DateTimeOffset.FromUnixTimeSeconds(e.CheckedAtUnix) <= AgeMaxAge)
             {
                 entry = e;
@@ -72,7 +77,7 @@ internal sealed class YouTubeStore
         return false;
     }
 
-    public void SetAge(string url, long? lastUploadUnix, string text, bool noVideos)
+    public void SetAge(string url, long? lastUploadUnix, string text, bool noVideos, bool hasShorts)
     {
         lock (_gate)
         {
@@ -81,7 +86,9 @@ internal sealed class YouTubeStore
                 LastUploadUnix = lastUploadUnix,
                 Text = text,
                 NoVideos = noVideos,
+                HasShorts = hasShorts,
                 CheckedAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                Version = 2,
             };
         }
     }
@@ -144,11 +151,11 @@ internal sealed class YouTubeStore
         static string Q(string s) => "\"" + (s ?? "").Replace("\"", "\"\"") + "\"";
 
         var sb = new StringBuilder();
-        sb.AppendLine("Name,Url,LastUploadEstimated,LastUploadAge,Inactive,Protected");
+        sb.AppendLine("Name,Url,LastUploadEstimated,LastUploadAge,Inactive,Protected,HasShorts");
         foreach (var c in channels)
         {
             var last = c.LastUploadUnix is long s ? DateTimeOffset.FromUnixTimeSeconds(s).ToString("yyyy-MM-dd") : "";
-            sb.AppendLine(string.Join(",", Q(c.Name), Q(c.Url), Q(last), Q(c.LastUploadText), c.IsInactive ? "yes" : "no", c.IsProtected ? "yes" : "no"));
+            sb.AppendLine(string.Join(",", Q(c.Name), Q(c.Url), Q(last), Q(c.LastUploadText), c.IsInactive ? "yes" : "no", c.IsProtected ? "yes" : "no", c.HasShorts ? "yes" : "no"));
         }
 
         return sb.ToString();

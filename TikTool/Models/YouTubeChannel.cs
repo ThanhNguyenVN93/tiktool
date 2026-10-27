@@ -32,6 +32,13 @@ public sealed class YouTubeChannel
     public bool AgeChecked { get; set; }
     public bool NoVideos { get; set; }
 
+    /// <summary>The channel has a Shorts tab. YouTube shows no dates for Shorts, so a channel whose long videos are old but which
+    /// posts Shorts may well be active.</summary>
+    public bool HasShorts { get; set; }
+
+    /// <summary>Old long videos but Shorts exist: we cannot tell whether it is inactive, so it is never auto-selected.</summary>
+    public bool IsUncertain { get; set; }
+
     public int? DaysSinceLastUpload => LastUploadUnix is long s
         ? (int)Math.Max(0, (DateTimeOffset.UtcNow - DateTimeOffset.FromUnixTimeSeconds(s)).TotalDays)
         : null;

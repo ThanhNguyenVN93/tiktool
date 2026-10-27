@@ -109,6 +109,7 @@ internal sealed class SettingsPage : UserControl
 
         flow.Controls.Add(BuildGroup(T("TẢI VIDEO", "DOWNLOAD"), BuildDownloadRows()));
         flow.Controls.Add(BuildGroup(T("BỎ THEO DÕI", "UNFOLLOW"), BuildUnfollowRows()));
+        flow.Controls.Add(BuildGroup("YOUTUBE", BuildYouTubeRows()));
         flow.Controls.Add(BuildGroup(T("GIAO DIỆN & HỆ THỐNG", "INTERFACE & SYSTEM"), BuildAppRows()));
         flow.Controls.Add(BuildGroup(T("NGÔN NGỮ", "LANGUAGE"), BuildLanguageRows()));
 
@@ -254,6 +255,62 @@ internal sealed class SettingsPage : UserControl
         };
     }
 
+    private List<Control> BuildYouTubeRows()
+    {
+        var signOut = new Guna2Button
+        {
+            Text = T("Đăng xuất", "Sign out"),
+            Font = Theme.FontMedium,
+            Size = new Size(130, 28),
+            FillColor = ColorTranslator.FromHtml("#2a2a2a"),
+            ForeColor = Theme.TextSecondary,
+            BorderRadius = 7,
+            Cursor = Cursors.Hand,
+        };
+        signOut.Click += (_, _) => SignOutYouTube();
+
+        return new List<Control>
+        {
+            BuildRow("🔑", T("Đăng xuất YouTube", "Sign out of YouTube"),
+                T("Xóa hồ sơ Chrome riêng của tool (phiên Google) và bộ nhớ đệm ngày đăng", "Deletes the tool's own Chrome profile (the Google session) and the upload-date cache"), signOut),
+        };
+    }
+
+    /// <summary>Forgets the YouTube/Google sign-in: removes the tool's private Chrome profile and the age cache. Backups (CSV) and the
+    /// protected-channel list are kept. Fails politely when the tool's Chrome window is still open (the profile is in use).</summary>
+    private void SignOutYouTube()
+    {
+        var ask = MessageBox.Show(
+            this,
+            T("Đăng xuất YouTube sẽ xóa hồ sơ Chrome riêng của tool (phiên đăng nhập Google) và bộ nhớ đệm ngày đăng.\nCác file sao lưu CSV và danh sách kênh được bảo vệ được giữ lại.\n\nTiếp tục?",
+              "Signing out of YouTube deletes the tool's own Chrome profile (the Google sign-in) and the upload-date cache.\nThe CSV backups and the protected-channel list are kept.\n\nContinue?"),
+            T("Social Toolkit — Đăng xuất YouTube", "Social Toolkit — Sign out of YouTube"),
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question,
+            MessageBoxDefaultButton.Button2);
+        if (ask != DialogResult.Yes)
+        {
+            return;
+        }
+
+        try
+        {
+            Directory.Delete(AppPaths.YouTubeProfileDir, true);
+            if (File.Exists(AppPaths.YouTubeAgesFile))
+            {
+                File.Delete(AppPaths.YouTubeAgesFile);
+            }
+
+            MessageBox.Show(this, T("Đã đăng xuất YouTube. Lần sau bạn sẽ đăng nhập Google lại.", "Signed out of YouTube. You will sign in to Google again next time."),
+                "Social Toolkit", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this,
+                T("Không xóa được: cửa sổ Chrome của tool có thể đang mở. Hãy đóng nó (hoặc thoát app) rồi thử lại.\n\n", "Could not delete it: the tool's Chrome window may still be open. Close it (or exit the app) and try again.\n\n") + ex.Message,
+                "Social Toolkit", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
     private List<Control> BuildAppRows()
     {
         _startWithWindowsToggle = BuildToggle();

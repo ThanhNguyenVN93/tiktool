@@ -412,7 +412,9 @@ internal sealed class YouTubePage : UserControl
         var days = ThresholdDays[Math.Max(0, _criteriaCombo.SelectedIndex)];
         foreach (var c in _channels)
         {
-            c.IsInactive = c.AgeChecked && (c.NoVideos || (c.DaysSinceLastUpload ?? 0) >= days);
+            // Shorts show no dates: old long videos + a Shorts tab means we cannot tell, so it is not called inactive.
+            c.IsUncertain = c.AgeChecked && c.HasShorts && (c.NoVideos || (c.DaysSinceLastUpload ?? 0) >= 30);
+            c.IsInactive = c.AgeChecked && !c.IsUncertain && (c.NoVideos || (c.DaysSinceLastUpload ?? 0) >= days);
         }
     }
 
@@ -565,6 +567,13 @@ internal sealed class YouTubePage : UserControl
     private Task ConnectAndLoadAsync() => RunBusyAsync(async ct =>
     {
         var progress = MakeProgress();
+        if (_service is not null && !await _service.IsAliveAsync())
+        {
+            progress.Report(T("Cửa sổ Chrome của tool đã đóng — đang kết nối lại...", "The tool's Chrome window was closed — reconnecting..."));
+            await _service.DisposeAsync();
+            _service = null;
+        }
+
         _service ??= new YouTubeService();
         progress.Report(T("Đang mở Chrome riêng...", "Opening the separate Chrome window..."));
         await _service.ConnectAsync(progress, ct);
@@ -580,6 +589,7 @@ internal sealed class YouTubePage : UserControl
                 c.LastUploadUnix = cached.LastUploadUnix;
                 c.LastUploadText = cached.Text;
                 c.NoVideos = cached.NoVideos;
+                c.HasShorts = cached.HasShorts;
                 c.AgeChecked = true;
             }
         }
@@ -623,8 +633,9 @@ internal sealed class YouTubePage : UserControl
                     channel.LastUploadUnix = age.LastUploadUnix;
                     channel.LastUploadText = age.Text;
                     channel.NoVideos = age.NoVideos;
+                    channel.HasShorts = age.HasShorts;
                     channel.AgeChecked = true;
-                    _store.SetAge(channel.Url, age.LastUploadUnix, age.Text, age.NoVideos);
+                    _store.SetAge(channel.Url, age.LastUploadUnix, age.Text, age.NoVideos, age.HasShorts);
                     streak = 0;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -760,9 +771,10 @@ internal sealed class YouTubePage : UserControl
                        $"[YouTube] Per-run limit: {limit} channels — the other {allSelected.Count - selected.Count} wait for the next run."), LogLevel.Warn);
         }
 
-        if (_service is null || !_service.IsConnected)
+        if (_service is null || !await _service.IsAliveAsync())
         {
-            _log.Log(T("[YouTube] Chưa kết nối YouTube — bấm \"Kết nối & tải\" trước.", "[YouTube] Not connected to YouTube — press \"Connect & load\" first."), LogLevel.Warn);
+            _log.Log(T("[YouTube] Chưa kết nối, hoặc cửa sổ Chrome của tool đã đóng — bấm \"Kết nối & tải\" / \"Tải lại\" trước.",
+                       "[YouTube] Not connected, or the tool's Chrome window was closed — press \"Connect & load\" / \"Reload\" first."), LogLevel.Warn);
             return;
         }
 

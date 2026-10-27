@@ -54,40 +54,7 @@ internal sealed class YouTubeService : IAsyncDisposable
             _context = _browser.Contexts.FirstOrDefault() ?? await _browser.NewContextAsync();
             var page = _context.Pages.FirstOrDefault() ?? await _context.NewPageAsync();
 
-            await page.GotoAsync(FeedUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 30_000 });
-            if (await IsSignedInAsync(page))
-            {
-                log.Report(T("✓ Đã đăng nhập YouTube (profile riêng nhớ phiên).", "✓ Signed in to YouTube (the tool's own profile remembered the login)."));
-            }
-            else
-            {
-                log.Report(T("Chưa đăng nhập — mở trang đăng nhập Google. Hãy đăng nhập trong cửa sổ Chrome vừa mở (tối đa 5 phút)...",
-                             "Not signed in — opening the Google sign-in page. Please sign in in the Chrome window that just opened (up to 5 minutes)..."));
-                await page.GotoAsync(SignInUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 30_000 });
-
-                var signedIn = false;
-                var deadline = DateTime.UtcNow.AddMinutes(5);
-                while (DateTime.UtcNow < deadline && !signedIn)
-                {
-                    ct.ThrowIfCancellationRequested();
-                    await Task.Delay(2000, ct);
-                    try
-                    {
-                        signedIn = page.Url.Contains("youtube.com", StringComparison.OrdinalIgnoreCase) && await IsSignedInAsync(page);
-                    }
-                    catch (PlaywrightException)
-                    {
-                        // mid-navigation, check again on the next tick
-                    }
-                }
-
-                if (!signedIn)
-                {
-                    throw new InvalidOperationException(T("Chưa đăng nhập sau 5 phút.", "Not signed in within 5 minutes."));
-                }
-
-                log.Report(T("✓ Đã đăng nhập.", "✓ Signed in."));
-            }
+            await EnsureSignedInAsync(page, log, ct);
 
             _feedPage = page;
         }
@@ -98,6 +65,67 @@ internal sealed class YouTubeService : IAsyncDisposable
         }
     }
 
+    /// <summary>True while the tool's Chrome window and its list tab still respond (the user may have closed the window).</summary>
+    public async Task<bool> IsAliveAsync()
+    {
+        if (_feedPage is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            if (_chrome is not null && _chrome.HasExited)
+            {
+                return false;
+            }
+
+            return await _feedPage.EvaluateAsync<bool>("() => true");
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Opens the list page and, if YouTube shows it signed out (first run, or the session expired), walks the user through
+    /// the Google sign-in in this window (up to 5 minutes).</summary>
+    private async Task EnsureSignedInAsync(IPage page, IProgress<string> log, CancellationToken ct)
+    {
+        await page.GotoAsync(FeedUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 30_000 });
+        if (await IsSignedInAsync(page))
+        {
+            log.Report(T("✓ Đã đăng nhập YouTube (profile riêng nhớ phiên).", "✓ Signed in to YouTube (the tool's own profile remembered the login)."));
+            return;
+        }
+
+        log.Report(T("Chưa đăng nhập — mở trang đăng nhập Google. Hãy đăng nhập trong cửa sổ Chrome vừa mở (tối đa 5 phút)...",
+                     "Not signed in — opening the Google sign-in page. Please sign in in the Chrome window that just opened (up to 5 minutes)..."));
+        await page.GotoAsync(SignInUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 30_000 });
+
+        var signedIn = false;
+        var deadline = DateTime.UtcNow.AddMinutes(5);
+        while (DateTime.UtcNow < deadline && !signedIn)
+        {
+            ct.ThrowIfCancellationRequested();
+            await Task.Delay(2000, ct);
+            try
+            {
+                signedIn = page.Url.Contains("youtube.com", StringComparison.OrdinalIgnoreCase) && await IsSignedInAsync(page);
+            }
+            catch (PlaywrightException)
+            {
+                // mid-navigation, check again on the next tick
+            }
+        }
+
+        if (!signedIn)
+        {
+            throw new InvalidOperationException(T("Chưa đăng nhập sau 5 phút.", "Not signed in within 5 minutes."));
+        }
+
+        log.Report(T("✓ Đã đăng nhập.", "✓ Signed in."));
+    }
     // ---------------------------------------------------------------------------------------------- list
 
     /// <summary>Opens (or reloads) the subscriptions list, scrolls until every channel is loaded and reads the rows.</summary>
@@ -105,6 +133,7 @@ internal sealed class YouTubeService : IAsyncDisposable
     {
         var page = _feedPage ?? throw new InvalidOperationException("Not connected.");
         await page.BringToFrontAsync();
+        await EnsureSignedInAsync(page, log, ct); // also re-signs in when the session expired while connected
         await page.GotoAsync(FeedUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 30_000 });
 
         try
@@ -191,7 +220,7 @@ internal sealed class YouTubeService : IAsyncDisposable
 
     // ---------------------------------------------------------------------------------------------- upload age
 
-    public readonly record struct AgeResult(long? LastUploadUnix, string Text, bool NoVideos);
+    public readonly record struct AgeResult(long? LastUploadUnix, string Text, bool NoVideos, bool HasShorts);
 
     /// <summary>Reads how long ago the newest video was posted from the channel's Videos tab (default sort: Latest) in a
     /// second tab. Approximate by design: YouTube shows "13h ago", "5d ago", "9mo ago", "3y ago".</summary>
@@ -220,31 +249,27 @@ internal sealed class YouTubeService : IAsyncDisposable
             await Task.Delay(400, ct);
         }
 
+        // The Videos tab does not list Shorts and Shorts show no dates, so note whether the channel has a Shorts tab at all.
+        var hasShorts = await page.EvaluateAsync<bool>(
+            "() => [...document.querySelectorAll('yt-tab-shape')].some(t => /^shorts$/i.test((t.innerText || '').trim()))");
+
         var text = await page.EvaluateAsync<string>(
             "() => { const g = document.querySelector('ytd-rich-grid-renderer'); return (g && g.innerText.trim()) ? g.innerText : (document.body ? document.body.innerText : ''); }");
-        var m = Regex.Match(text, @"(\d+)\s*(second|minute|hour|day|week|month|year|sec|min|mo|[smhdwy])s?\s+ago");
+        var m = AgeText.Find(text);
         if (m.Success)
         {
-            var days = ApproxDays(int.Parse(m.Groups[1].Value), m.Groups[2].Value);
-            return new AgeResult(DateTimeOffset.UtcNow.AddDays(-days).ToUnixTimeSeconds(), m.Value, false);
+            var days = AgeText.ApproxDays(int.Parse(m.Groups[1].Value), m.Groups[2].Value);
+            return new AgeResult(DateTimeOffset.UtcNow.AddDays(-days).ToUnixTimeSeconds(), m.Value, false, hasShorts);
         }
 
-        if (text.Contains("doesn't have any content", StringComparison.OrdinalIgnoreCase))
+        if (hasShorts || text.Contains("doesn't have any content", StringComparison.OrdinalIgnoreCase))
         {
-            return new AgeResult(null, "", true);
+            // No long videos. With a Shorts tab the channel may be a Shorts-only (active) one; the page flags that as unclear.
+            return new AgeResult(null, "", true, hasShorts);
         }
 
         throw new InvalidOperationException(T("Không đọc được tuổi video trên trang kênh.", "Could not read the upload age on the channel page."));
     }
-
-    private static int ApproxDays(int amount, string unit) => unit.ToLowerInvariant() switch
-    {
-        "y" or "year" => amount * 365,
-        "mo" or "month" => amount * 30,
-        "w" or "week" => amount * 7,
-        "d" or "day" => amount,
-        _ => 0, // seconds, minutes, hours
-    };
 
     // ---------------------------------------------------------------------------------------------- unsubscribe
 

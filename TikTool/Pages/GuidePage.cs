@@ -123,6 +123,23 @@ internal sealed class GuidePage : UserControl
                   "⚠️ Google Chrome (or Edge) must be installed; Social Toolkit drives that browser and downloads nothing extra."),
             }));
 
+        flow.Controls.Add(BuildSection("▶️", T("Tab YouTube — Hủy đăng ký kênh không hoạt động", "YouTube Tab — Unsubscribe inactive channels"),
+            T("Dùng một cửa sổ Chrome riêng của tool; bạn đăng nhập Google một lần", "Uses a separate Chrome window of the tool; you sign in to Google once"),
+            new[]
+            {
+                T("1. Vào Bỏ theo dõi → YouTube Unsubscribe, bấm \"Kết nối & tải\". Một cửa sổ Chrome riêng mở ra; đăng nhập Google nếu được hỏi (lần sau không cần).",
+                  "1. Go to Unfollow → YouTube Unsubscribe and click \"Connect & load\". A separate Chrome window opens; sign in to Google if asked (not needed next time)."),
+                T("2. Tool tải danh sách đăng ký rồi tự đọc ngày đăng video mới nhất của từng kênh (khoảng 1–2 giây mỗi kênh, được nhớ 7 ngày). Có thể bấm Dừng bất cứ lúc nào.",
+                  "2. The tool loads your subscriptions and reads each channel's latest upload (about 1–2 s per channel, remembered for 7 days). You can press Stop at any time."),
+                T("3. Kênh không hoạt động = không đăng video quá ngưỡng bạn chọn (mặc định 1 năm). Kênh có Shorts mà video dài đã cũ được ghi \"Có Shorts — chưa rõ\" vì YouTube không cho biết ngày của Shorts; tool không tự chọn các kênh này.",
+                  "3. An inactive channel has not uploaded within the threshold you pick (default 1 year). A channel with old long videos but Shorts is marked \"Has Shorts — unclear\" because YouTube shows no dates for Shorts; the tool never selects those by itself."),
+                T("4. Chọn kênh (hoặc \"Chọn không hoạt động\") rồi bấm Hủy đăng ký. Tool hỏi xác nhận và tự sao lưu danh sách ra file CSV trước khi hủy.",
+                  "4. Select channels (or \"Select inactive\") and click Unsubscribe. The tool asks for confirmation and first backs your list up to a CSV file."),
+                T("5. Chuột phải vào kênh để bảo vệ (không bao giờ bị hủy), mở hoặc sao chép link. Muốn đăng ký lại, dùng link trong CSV hoặc tab Lịch sử.",
+                  "5. Right-click a channel to protect it (never unsubscribed), open it or copy its link. To subscribe again use the link in the CSV or the History tab."),
+                T("🔑 Đăng xuất YouTube: Cài đặt → YouTube → Đăng xuất (xóa hồ sơ Chrome riêng của tool).",
+                  "🔑 To sign out of YouTube: Settings → YouTube → Sign out (deletes the tool's own Chrome profile)."),
+            }));
         flow.Controls.Add(BuildSection("⚙️", T("Cài đặt quan trọng", "Key settings"),
             T("Các tùy chọn ảnh hưởng đến hiệu năng", "Options that affect performance"),
             new[]
