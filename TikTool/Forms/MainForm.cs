@@ -38,6 +38,7 @@ public sealed class MainForm : Form
     public MainForm()
     {
         Text = "Social Toolkit";
+        Icon = LoadAppIcon();
         StartPosition = FormStartPosition.CenterScreen;
         Size = new Size(1080, 700);
         MinimumSize = new Size(900, 600);
@@ -139,6 +140,15 @@ public sealed class MainForm : Form
         {
             return SystemIcons.Application;
         }
+    }
+
+    /// <summary>Called when the user starts a second copy of the app: show this window instead of opening another one.</summary>
+    public void BringToFrontFromAnotherInstance()
+    {
+        RestoreFromTray();
+        TopMost = true;
+        TopMost = false;
+        Activate();
     }
 
     private void OpenFromTray(string pageKey)
