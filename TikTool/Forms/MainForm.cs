@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Guna.UI2.WinForms;
 using TikTool.Pages;
 using TikTool.Services;
@@ -112,15 +112,39 @@ public sealed class MainForm : Form
         var menu = new ContextMenuStrip();
         menu.Items.Add(T("Mở Social Toolkit", "Open Social Toolkit"), null, (_, _) => RestoreFromTray());
         menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add(T("Tải video", "Download"), null, (_, _) => OpenFromTray("download"));
+        menu.Items.Add(T("TikTok Unfollow", "TikTok Unfollow"), null, (_, _) => OpenFromTray(TikTokUnfollowKey));
+        menu.Items.Add(T("YouTube Unsubscribe", "YouTube Unsubscribe"), null, (_, _) => OpenFromTray(YouTubeUnsubKey));
+        menu.Items.Add(T("Lịch sử", "History"), null, (_, _) => OpenFromTray("history"));
+        menu.Items.Add(T("Cài đặt", "Settings"), null, (_, _) => OpenFromTray("settings"));
+        menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(T("Thoát", "Exit"), null, (_, _) => { _trayIcon!.Visible = false; Application.Exit(); });
 
         _trayIcon = new NotifyIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = LoadAppIcon(),
             Text = "Social Toolkit",
             ContextMenuStrip = menu,
         };
         _trayIcon.DoubleClick += (_, _) => RestoreFromTray();
+    }
+
+    private static Icon LoadAppIcon()
+    {
+        try
+        {
+            return Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
+        }
+        catch (Exception)
+        {
+            return SystemIcons.Application;
+        }
+    }
+
+    private void OpenFromTray(string pageKey)
+    {
+        RestoreFromTray();
+        NavigateTo(pageKey);
     }
 
     private void RestoreFromTray()
