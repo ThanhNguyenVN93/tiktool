@@ -401,27 +401,48 @@ public sealed class PlaywrightService : IAsyncDisposable
             {
                 try
                 {
-                    // Several SMALL wheel ticks, not one big jump — confirmed live 2026-09-13 that
-                    // a single large WheelAsync(0, 2000) wasn't reliable at triggering further
-                    // loading in this panel. A real human scroll arrives as a sequence of small
-                    // deltas with gaps between them (letting the browser fire intermediate
-                    // scroll/intersection events as content comes into view), so this mimics that
-                    // instead of jumping straight to the bottom in one motion.
-                    var box = await itemsLocator.Nth(count - 1).BoundingBoxAsync();
-                    if (box is not null)
+                    // Confirmed live (2026-10-27): Playwright's Mouse.WheelAsync was NOT scrolling
+                    // the panel — debug logs showed scrollTop=0 after 10 ticks of 350px. The wheel
+                    // events fire on whatever is under the cursor, which may be the page body
+                    // rather than the panel's own scroll container. Direct JS scrollBy() on the
+                    // actual scrollable ancestor is the only approach confirmed to move scrollTop.
+                    var scrolled = await page.EvaluateAsync<bool>(@"(selector) => {
+                        const item = document.querySelector(selector);
+                        if (!item) return false;
+                        let el = item.parentElement;
+                        while (el && el !== document.body) {
+                            const ov = getComputedStyle(el).overflowY;
+                            if ((ov === 'auto' || ov === 'scroll') && el.scrollHeight > el.clientHeight) {
+                                el.scrollBy(0, 1800);
+                                return true;
+                            }
+                            el = el.parentElement;
+                        }
+                        return false;
+                    }", selectors.FollowingItem);
+
+                    if (!scrolled)
                     {
-                        await page.Mouse.MoveAsync(box.X + box.Width / 2, box.Y + box.Height / 2);
-                        for (var tick = 0; tick < 10; tick++)
+                        // The overflowY check missed the container (some TikTok DOM variants use
+                        // the shorthand overflow: scroll rather than overflow-y). Try ScrollIntoView
+                        // on the last item as a last resort, and also fire a few wheel ticks with
+                        // the cursor positioned over the last item so the browser's own hit-test
+                        // picks the right element.
+                        await itemsLocator.Nth(count - 1).ScrollIntoViewIfNeededAsync();
+                        var box = await itemsLocator.Nth(count - 1).BoundingBoxAsync();
+                        if (box is not null)
                         {
-                            await page.Mouse.WheelAsync(0, 350);
-                            await Task.Delay(150, ct);
+                            await page.Mouse.MoveAsync(box.X + box.Width / 2, box.Y + box.Height / 2);
+                            for (var tick = 0; tick < 5; tick++)
+                            {
+                                await page.Mouse.WheelAsync(0, 400);
+                                await Task.Delay(200, ct);
+                            }
                         }
                     }
                 }
                 catch
                 {
-                    // Fall back to the previous, less reliable approach if the popup handle is
-                    // somehow gone (e.g. modal closed) — better than throwing mid-scrape.
                     await itemsLocator.Nth(count - 1).ScrollIntoViewIfNeededAsync();
                 }
             }
