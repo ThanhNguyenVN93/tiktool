@@ -38,6 +38,16 @@ internal static class AppPaths
         }
     }
 
+    public static string YouTubeProfileDir
+    {
+        get
+        {
+            var dir = Path.Combine(AppDataDir, "youtube_profile");
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+    }
+
     public static string SessionFile => Path.Combine(AppDataDir, "session_resume.dat");
     public static string WhitelistFile => Path.Combine(AppDataDir, "whitelist.dat");
 
