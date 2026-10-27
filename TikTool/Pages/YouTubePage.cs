@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using Guna.UI2.WinForms;
 using TikTool.Forms;
@@ -259,7 +259,9 @@ internal sealed class YouTubePage : UserControl
         {
             Font = Theme.FontLabel,
             ForeColor = ColorTranslator.FromHtml("#444444"),
-            AutoSize = true,
+            AutoSize = false,
+            AutoEllipsis = true,
+            Size = new Size(Math.Max(120, ContentWidth - 150 - 8 - 170 - 8 - 170 - 12), 18),
             Location = new Point(0, 6),
         };
 
@@ -351,7 +353,7 @@ internal sealed class YouTubePage : UserControl
         var anyInactive = _channels.Any(c => c.IsInactive && !c.IsProtected && c.Status != YouTubeChannelStatus.Done);
 
         _btnConnect.Enabled = !_isBusy;
-        _btnConnect.Text = _loadedOnce ? T("🔄  Tải lại", "🔄  Reload") : T("🔌  Kết nối & tải", "🔌  Connect & load");
+        _btnConnect.Text = _loadedOnce ? T("🔄  Tải lại", "🔄  Reload") : T("🔌  Kết nối", "🔌  Connect");
         _btnSelectInactive.Enabled = !_isBusy && anyInactive;
         _btnSelectShown.Enabled = !_isBusy && hasChannels;
         _btnClear.Enabled = !_isBusy && _channels.Any(c => c.IsSelected);
@@ -368,8 +370,8 @@ internal sealed class YouTubePage : UserControl
             ? T("Đang kết nối và tải danh sách đăng ký…", "Connecting and loading your subscriptions…")
             : _loadedOnce
                 ? T("Không tìm thấy kênh đăng ký nào.", "No subscribed channels found.")
-                : T("Bấm \"Kết nối & tải\": một cửa sổ Chrome riêng sẽ mở, bạn đăng nhập Google một lần.",
-                    "Press \"Connect & load\": a separate Chrome window opens and you sign in to Google once.");
+                : T("Bấm \"Kết nối\": một cửa sổ Chrome riêng sẽ mở, bạn đăng nhập Google một lần.",
+                    "Press \"Connect\": a separate Chrome window opens and you sign in to Google once.");
 
         _actionInfo.Text = T($"{selectedCount} đã chọn", $"{selectedCount} selected");
     }
@@ -654,7 +656,7 @@ internal sealed class YouTubePage : UserControl
                 RecomputeInactive();
                 RefreshRow(channel);
                 done++;
-                _progressText = T($"đang đọc ngày đăng {done}/{todo.Count} ({done * 100 / todo.Count}%)", $"reading upload dates {done}/{todo.Count} ({done * 100 / todo.Count}%)");
+                _progressText = T($"đang đọc ngày {done}/{todo.Count}", $"reading dates {done}/{todo.Count}");
                 UpdateSectionLabel(_rows.Count);
                 if (done % 10 == 0)
                 {
@@ -773,8 +775,8 @@ internal sealed class YouTubePage : UserControl
 
         if (_service is null || !await _service.IsAliveAsync())
         {
-            _log.Log(T("[YouTube] Chưa kết nối, hoặc cửa sổ Chrome của tool đã đóng — bấm \"Kết nối & tải\" / \"Tải lại\" trước.",
-                       "[YouTube] Not connected, or the tool's Chrome window was closed — press \"Connect & load\" / \"Reload\" first."), LogLevel.Warn);
+            _log.Log(T("[YouTube] Chưa kết nối, hoặc cửa sổ Chrome của tool đã đóng — bấm \"Kết nối\" / \"Tải lại\" trước.",
+                       "[YouTube] Not connected, or the tool's Chrome window was closed — press \"Connect\" / \"Reload\" first."), LogLevel.Warn);
             return;
         }
 

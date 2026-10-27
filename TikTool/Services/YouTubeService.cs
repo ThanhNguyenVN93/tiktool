@@ -90,12 +90,16 @@ internal sealed class YouTubeService : IAsyncDisposable
 
     /// <summary>Opens the list page and, if YouTube shows it signed out (first run, or the session expired), walks the user through
     /// the Google sign-in in this window (up to 5 minutes).</summary>
-    private async Task EnsureSignedInAsync(IPage page, IProgress<string> log, CancellationToken ct)
+    private async Task EnsureSignedInAsync(IPage page, IProgress<string> log, CancellationToken ct, bool announceWhenSignedIn = true)
     {
         await page.GotoAsync(FeedUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 30_000 });
         if (await IsSignedInAsync(page))
         {
-            log.Report(T("✓ Đã đăng nhập YouTube (profile riêng nhớ phiên).", "✓ Signed in to YouTube (the tool's own profile remembered the login)."));
+            if (announceWhenSignedIn)
+            {
+                log.Report(T("✓ Đã đăng nhập YouTube (profile riêng nhớ phiên).", "✓ Signed in to YouTube (the tool's own profile remembered the login)."));
+            }
+
             return;
         }
 
@@ -133,7 +137,7 @@ internal sealed class YouTubeService : IAsyncDisposable
     {
         var page = _feedPage ?? throw new InvalidOperationException("Not connected.");
         await page.BringToFrontAsync();
-        await EnsureSignedInAsync(page, log, ct); // also re-signs in when the session expired while connected
+        await EnsureSignedInAsync(page, log, ct, announceWhenSignedIn: false); // also re-signs in when the session expired while connected
         await page.GotoAsync(FeedUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 30_000 });
 
         try

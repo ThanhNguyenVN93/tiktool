@@ -1,4 +1,4 @@
-using Guna.UI2.WinForms;
+﻿using Guna.UI2.WinForms;
 using TikTool.Forms;
 
 namespace TikTool.Pages;
@@ -127,8 +127,8 @@ internal sealed class GuidePage : UserControl
             T("Dùng một cửa sổ Chrome riêng của tool; bạn đăng nhập Google một lần", "Uses a separate Chrome window of the tool; you sign in to Google once"),
             new[]
             {
-                T("1. Vào Bỏ theo dõi → YouTube Unsubscribe, bấm \"Kết nối & tải\". Một cửa sổ Chrome riêng mở ra; đăng nhập Google nếu được hỏi (lần sau không cần).",
-                  "1. Go to Unfollow → YouTube Unsubscribe and click \"Connect & load\". A separate Chrome window opens; sign in to Google if asked (not needed next time)."),
+                T("1. Vào Bỏ theo dõi → YouTube Unsubscribe, bấm \"Kết nối\". Một cửa sổ Chrome riêng mở ra; đăng nhập Google nếu được hỏi (lần sau không cần).",
+                  "1. Go to Unfollow → YouTube Unsubscribe and click \"Connect\". A separate Chrome window opens; sign in to Google if asked (not needed next time)."),
                 T("2. Tool tải danh sách đăng ký rồi tự đọc ngày đăng video mới nhất của từng kênh (khoảng 1–2 giây mỗi kênh, được nhớ 7 ngày). Có thể bấm Dừng bất cứ lúc nào.",
                   "2. The tool loads your subscriptions and reads each channel's latest upload (about 1–2 s per channel, remembered for 7 days). You can press Stop at any time."),
                 T("3. Kênh không hoạt động = không đăng video quá ngưỡng bạn chọn (mặc định 1 năm). Kênh có Shorts mà video dài đã cũ được ghi \"Có Shorts — chưa rõ\" vì YouTube không cho biết ngày của Shorts; tool không tự chọn các kênh này.",

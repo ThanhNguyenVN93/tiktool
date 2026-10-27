@@ -1,4 +1,4 @@
-using Guna.UI2.WinForms;
+﻿using Guna.UI2.WinForms;
 using Microsoft.Win32;
 using TikTool.Forms;
 using TikTool.Models;
@@ -44,6 +44,10 @@ internal sealed class SettingsPage : UserControl
         BackColor = Theme.Background;
         BuildUi();
         LoadFromSettings();
+        VisibleChanged += (_, _) =>
+        {
+            if (Visible && IsHandleCreated) UpdateSignOutButton();
+        };
     }
 
     private void BuildUi()
@@ -255,6 +259,8 @@ internal sealed class SettingsPage : UserControl
         };
     }
 
+    private Guna2Button _btnSignOutYouTube = null!;
+
     private List<Control> BuildYouTubeRows()
     {
         var signOut = new Guna2Button
@@ -267,13 +273,64 @@ internal sealed class SettingsPage : UserControl
             BorderRadius = 7,
             Cursor = Cursors.Hand,
         };
+        signOut.DisabledState.FillColor = ColorTranslator.FromHtml("#1a1a1a");
+        signOut.DisabledState.ForeColor = Theme.TextMuted;
         signOut.Click += (_, _) => SignOutYouTube();
+        _btnSignOutYouTube = signOut;
+        UpdateSignOutButton();
 
         return new List<Control>
         {
             BuildRow("🔑", T("Đăng xuất YouTube", "Sign out of YouTube"),
                 T("Xóa hồ sơ Chrome riêng của tool (phiên Google) và bộ nhớ đệm ngày đăng", "Deletes the tool's own Chrome profile (the Google session) and the upload-date cache"), signOut),
         };
+    }
+
+    /// <summary>True when the tool's private Chrome profile holds a Google sign-in cookie. The profile folder alone proves nothing: Chrome
+    /// recreates it as soon as the tool opens the sign-in page. When the cookie file cannot be read, assume signed in so the button stays usable.</summary>
+    private static bool HasGoogleSession()
+    {
+        if (!Directory.Exists(AppPaths.YouTubeProfileDir))
+        {
+            return false;
+        }
+
+        var cookieFile = Path.Combine(AppPaths.YouTubeProfileDir, "Default", "Network", "Cookies");
+        if (!File.Exists(cookieFile))
+        {
+            return false;
+        }
+
+        var copy = Path.Combine(Path.GetTempPath(), $"tiktool_yt_cookies_{Guid.NewGuid():N}.db");
+        try
+        {
+            using (var src = new FileStream(cookieFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+            using (var dst = new FileStream(copy, FileMode.Create, FileAccess.Write))
+            {
+                src.CopyTo(dst);
+            }
+
+            using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={copy};Pooling=False;Mode=ReadOnly");
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT 1 FROM cookies WHERE host_key LIKE '%google.com' AND name IN ('SAPISID', '__Secure-1PSID', 'SID') LIMIT 1";
+            return cmd.ExecuteScalar() != null;
+        }
+        catch (Exception)
+        {
+            return true;
+        }
+        finally
+        {
+            try { File.Delete(copy); } catch (IOException) { }
+        }
+    }
+
+    private void UpdateSignOutButton()
+    {
+        var signedIn = HasGoogleSession();
+        _btnSignOutYouTube.Enabled = signedIn;
+        _btnSignOutYouTube.Text = signedIn ? T("Đăng xuất", "Sign out") : T("Đã đăng xuất", "Signed out");
     }
 
     /// <summary>Forgets the YouTube/Google sign-in: removes the tool's private Chrome profile and the age cache. Backups (CSV) and the
@@ -295,7 +352,11 @@ internal sealed class SettingsPage : UserControl
 
         try
         {
-            Directory.Delete(AppPaths.YouTubeProfileDir, true);
+            if (Directory.Exists(AppPaths.YouTubeProfileDir))
+            {
+                Directory.Delete(AppPaths.YouTubeProfileDir, true);
+            }
+
             if (File.Exists(AppPaths.YouTubeAgesFile))
             {
                 File.Delete(AppPaths.YouTubeAgesFile);
@@ -303,6 +364,7 @@ internal sealed class SettingsPage : UserControl
 
             MessageBox.Show(this, T("Đã đăng xuất YouTube. Lần sau bạn sẽ đăng nhập Google lại.", "Signed out of YouTube. You will sign in to Google again next time."),
                 "Social Toolkit", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            UpdateSignOutButton();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
