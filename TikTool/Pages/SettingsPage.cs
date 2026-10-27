@@ -33,6 +33,7 @@ internal sealed class SettingsPage : UserControl
 
     private Guna2ToggleSwitch _startWithWindowsToggle = null!;
     private Guna2ToggleSwitch _minimizeToTrayToggle = null!;
+    private Guna2ToggleSwitch _embeddedBrowserToggle = null!;
 
     private Label _savedInfo = null!;
 
@@ -279,23 +280,26 @@ internal sealed class SettingsPage : UserControl
         _btnSignOutYouTube = signOut;
         UpdateSignOutButton();
 
+        _embeddedBrowserToggle = BuildToggle();
+
         return new List<Control>
         {
+            BuildRow("🌐", T("Dùng trình duyệt tích hợp (thử nghiệm)", "Use the built-in browser (beta)"),
+                T("Không cần Chrome: đăng nhập ngay trong cửa sổ của app (cần WebView2, có sẵn trên Windows 11). Áp dụng cho lần Kết nối tiếp theo.",
+                  "No Chrome needed: sign in inside an app window (needs WebView2, included with Windows 11). Applies the next time you connect."), _embeddedBrowserToggle),
             BuildRow("🔑", T("Đăng xuất YouTube", "Sign out of YouTube"),
-                T("Xóa hồ sơ Chrome riêng của tool (phiên Google) và bộ nhớ đệm ngày đăng", "Deletes the tool's own Chrome profile (the Google session) and the upload-date cache"), signOut),
+                T("Xóa hồ sơ trình duyệt riêng của tool (phiên Google) và bộ nhớ đệm ngày đăng", "Deletes the tool's own browser profile (the Google session) and the upload-date cache"), signOut),
         };
     }
 
     /// <summary>True when the tool's private Chrome profile holds a Google sign-in cookie. The profile folder alone proves nothing: Chrome
     /// recreates it as soon as the tool opens the sign-in page. When the cookie file cannot be read, assume signed in so the button stays usable.</summary>
-    private static bool HasGoogleSession()
-    {
-        if (!Directory.Exists(AppPaths.YouTubeProfileDir))
-        {
-            return false;
-        }
+    private static bool HasGoogleSession() =>
+        HasGoogleSessionIn(Path.Combine(AppPaths.YouTubeProfileDir, "Default", "Network", "Cookies"))
+        || HasGoogleSessionIn(Path.Combine(AppPaths.YouTubeWebViewDir, "EBWebView", "Default", "Network", "Cookies"));
 
-        var cookieFile = Path.Combine(AppPaths.YouTubeProfileDir, "Default", "Network", "Cookies");
+    private static bool HasGoogleSessionIn(string cookieFile)
+    {
         if (!File.Exists(cookieFile))
         {
             return false;
@@ -339,8 +343,8 @@ internal sealed class SettingsPage : UserControl
     {
         var ask = MessageBox.Show(
             this,
-            T("Đăng xuất YouTube sẽ xóa hồ sơ Chrome riêng của tool (phiên đăng nhập Google) và bộ nhớ đệm ngày đăng.\nCác file sao lưu CSV và danh sách kênh được bảo vệ được giữ lại.\n\nTiếp tục?",
-              "Signing out of YouTube deletes the tool's own Chrome profile (the Google sign-in) and the upload-date cache.\nThe CSV backups and the protected-channel list are kept.\n\nContinue?"),
+            T("Đăng xuất YouTube sẽ xóa hồ sơ trình duyệt riêng của tool (phiên đăng nhập Google) và bộ nhớ đệm ngày đăng.\nCác file sao lưu CSV và danh sách kênh được bảo vệ được giữ lại.\n\nTiếp tục?",
+              "Signing out of YouTube deletes the tool's own browser profile (the Google sign-in) and the upload-date cache.\nThe CSV backups and the protected-channel list are kept.\n\nContinue?"),
             T("Social Toolkit — Đăng xuất YouTube", "Social Toolkit — Sign out of YouTube"),
             MessageBoxButtons.YesNo,
             MessageBoxIcon.Question,
@@ -357,6 +361,11 @@ internal sealed class SettingsPage : UserControl
                 Directory.Delete(AppPaths.YouTubeProfileDir, true);
             }
 
+            if (Directory.Exists(AppPaths.YouTubeWebViewDir))
+            {
+                Directory.Delete(AppPaths.YouTubeWebViewDir, true);
+            }
+
             if (File.Exists(AppPaths.YouTubeAgesFile))
             {
                 File.Delete(AppPaths.YouTubeAgesFile);
@@ -369,7 +378,7 @@ internal sealed class SettingsPage : UserControl
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             MessageBox.Show(this,
-                T("Không xóa được: cửa sổ Chrome của tool có thể đang mở. Hãy đóng nó (hoặc thoát app) rồi thử lại.\n\n", "Could not delete it: the tool's Chrome window may still be open. Close it (or exit the app) and try again.\n\n") + ex.Message,
+                T("Không xóa được: cửa sổ trình duyệt của tool có thể đang mở. Hãy đóng nó (hoặc thoát app) rồi thử lại.\n\n", "Could not delete it: the tool's browser window may still be open. Close it (or exit the app) and try again.\n\n") + ex.Message,
                 "Social Toolkit", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
@@ -510,6 +519,7 @@ internal sealed class SettingsPage : UserControl
 
         _startWithWindowsToggle.Checked = s.StartWithWindows;
         _minimizeToTrayToggle.Checked = s.MinimizeToTray;
+        _embeddedBrowserToggle.Checked = s.UseEmbeddedBrowser;
 
         _languageCombo.SelectedIndex = s.Language == "en" ? 1 : 0;
     }
@@ -542,6 +552,7 @@ internal sealed class SettingsPage : UserControl
 
         s.StartWithWindows = _startWithWindowsToggle.Checked;
         s.MinimizeToTray = _minimizeToTrayToggle.Checked;
+        s.UseEmbeddedBrowser = _embeddedBrowserToggle.Checked;
 
         var newLang = _languageCombo.SelectedIndex == 1 ? "en" : "vi";
         var langChanged = newLang != s.Language;

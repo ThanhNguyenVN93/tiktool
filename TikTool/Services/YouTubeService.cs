@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
+using TikTool.Browser;
 using TikTool.Models;
 
 namespace TikTool.Services;
@@ -18,12 +19,18 @@ internal sealed class YouTubeService : IAsyncDisposable
     private const string FeedUrl = "https://www.youtube.com/feed/channels?hl=en";
     private const string SignInUrl = "https://accounts.google.com/ServiceLogin?service=youtube&hl=en&continue=https%3A%2F%2Fwww.youtube.com%2Ffeed%2Fchannels%3Fhl%3Den";
 
-    private Process? _chrome;
+    private IBrowserHost? _host;
+    private readonly bool _embedded;
     private IPlaywright? _playwright;
-    private IBrowser? _browser;
     private IBrowserContext? _context;
     private IPage? _feedPage;
     private IPage? _agePage;
+
+    /// <param name="useEmbeddedBrowser">true = the built-in WebView2 window, false = the installed Chrome/Edge as a separate window.</param>
+    public YouTubeService(bool useEmbeddedBrowser = false)
+    {
+        _embedded = useEmbeddedBrowser;
+    }
 
     public bool IsConnected => _feedPage is not null;
 
@@ -36,22 +43,15 @@ internal sealed class YouTubeService : IAsyncDisposable
             return;
         }
 
-        var chromePath = PlaywrightService.FindRealChromeExecutable()
-            ?? throw new InvalidOperationException(T("Không tìm thấy Google Chrome/Edge trên máy.", "Google Chrome/Edge was not found on this computer."));
-
         try
         {
-            var port = GetFreePort();
-            _chrome = Process.Start(new ProcessStartInfo
-            {
-                FileName = chromePath,
-                Arguments = $"--remote-debugging-port={port} --user-data-dir=\"{AppPaths.YouTubeProfileDir}\" --no-first-run --no-default-browser-check --window-size=1280,900 about:blank",
-                UseShellExecute = false,
-            }) ?? throw new InvalidOperationException(T("Không khởi chạy được Chrome.", "Could not start Chrome."));
-
             _playwright = await Playwright.CreateAsync();
-            _browser = await ConnectOverCdpAsync(_playwright, port, ct);
-            _context = _browser.Contexts.FirstOrDefault() ?? await _browser.NewContextAsync();
+            _host = BrowserHosts.Create(_embedded);
+            _context = await _host.StartAsync(
+                _playwright,
+                _embedded ? AppPaths.YouTubeWebViewDir : AppPaths.YouTubeProfileDir,
+                T("Social Toolkit — Trình duyệt YouTube", "Social Toolkit — YouTube browser"),
+                ct);
             var page = _context.Pages.FirstOrDefault() ?? await _context.NewPageAsync();
 
             await EnsureSignedInAsync(page, log, ct);
@@ -75,7 +75,7 @@ internal sealed class YouTubeService : IAsyncDisposable
 
         try
         {
-            if (_chrome is not null && _chrome.HasExited)
+            if (_host is not { IsRunning: true })
             {
                 return false;
             }
@@ -103,8 +103,8 @@ internal sealed class YouTubeService : IAsyncDisposable
             return;
         }
 
-        log.Report(T("Chưa đăng nhập — mở trang đăng nhập Google. Hãy đăng nhập trong cửa sổ Chrome vừa mở (tối đa 5 phút)...",
-                     "Not signed in — opening the Google sign-in page. Please sign in in the Chrome window that just opened (up to 5 minutes)..."));
+        log.Report(T("Chưa đăng nhập — mở trang đăng nhập Google. Hãy đăng nhập trong cửa sổ trình duyệt vừa mở (tối đa 5 phút)...",
+                     "Not signed in — opening the Google sign-in page. Please sign in in the browser window that just opened (up to 5 minutes)..."));
         await page.GotoAsync(SignInUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 30_000 });
 
         var signedIn = false;
@@ -230,10 +230,18 @@ internal sealed class YouTubeService : IAsyncDisposable
     /// second tab. Approximate by design: YouTube shows "13h ago", "5d ago", "9mo ago", "3y ago".</summary>
     public async Task<AgeResult> ReadLatestUploadAsync(string channelUrl, CancellationToken ct)
     {
-        var context = _context ?? throw new InvalidOperationException("Not connected.");
-        _agePage ??= await context.NewPageAsync();
+        if (_context is null || _host is null)
+        {
+            throw new InvalidOperationException("Not connected.");
+        }
+
+        _agePage ??= await _host.NewWorkerPageAsync(ct);
         var page = _agePage;
-        await page.BringToFrontAsync();
+        if (!_embedded)
+        {
+            // A background Chrome tab is throttled, so bring it forward; the built-in reading frame is hidden on purpose.
+            await page.BringToFrontAsync();
+        }
 
         var path = new Uri(channelUrl).AbsolutePath.TrimEnd('/');
         await page.GotoAsync($"https://www.youtube.com{path}/videos?hl=en", new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 30_000 });
@@ -417,60 +425,14 @@ internal sealed class YouTubeService : IAsyncDisposable
         }
     }
 
-    private static int GetFreePort()
-    {
-        using var listener = new TcpListener(System.Net.IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
-    }
-
-    private static async Task<IBrowser> ConnectOverCdpAsync(IPlaywright playwright, int port, CancellationToken ct)
-    {
-        Exception? last = null;
-        for (var i = 0; i < 20; i++)
-        {
-            ct.ThrowIfCancellationRequested();
-            try
-            {
-                return await playwright.Chromium.ConnectOverCDPAsync($"http://localhost:{port}");
-            }
-            catch (Exception ex)
-            {
-                last = ex;
-                await Task.Delay(500, ct);
-            }
-        }
-
-        throw new InvalidOperationException(
-            T($"Không kết nối được vào Chrome (cổng {port}). Nếu một cửa sổ Chrome của tool đang mở sẵn, hãy đóng nó rồi thử lại.",
-              $"Could not connect to Chrome (port {port}). If a Chrome window opened by this tool is already open, close it and try again."), last);
-    }
-
-    /// <summary>Quits Chrome through its own CDP "Browser.close" so the profile is flushed cleanly (the sign-in cookies
-    /// survive); a hard kill can lose the newest cookies. Falls back to killing the process.</summary>
+    /// <summary>Closes the browser (Chrome is quit through CDP so the profile is flushed; the built-in window is simply closed).</summary>
     public async ValueTask DisposeAsync()
     {
         try
         {
-            var page = _feedPage ?? _agePage ?? _context?.Pages.FirstOrDefault();
-            if (page is not null)
+            if (_host is not null)
             {
-                var session = await page.Context.NewCDPSessionAsync(page);
-                await session.SendAsync("Browser.close");
-            }
-        }
-        catch
-        {
-            // fall through to the process-level cleanup
-        }
-
-        try
-        {
-            if (_chrome is not null && !_chrome.WaitForExit(6000))
-            {
-                _chrome.Kill(entireProcessTree: true);
+                await _host.DisposeAsync();
             }
         }
         catch
@@ -480,11 +442,9 @@ internal sealed class YouTubeService : IAsyncDisposable
 
         try { _playwright?.Dispose(); } catch { /* best effort */ }
 
-        _chrome = null;
+        _host = null;
         _playwright = null;
-        _browser = null;
         _context = null;
         _feedPage = null;
         _agePage = null;
-    }
-}
+    }}

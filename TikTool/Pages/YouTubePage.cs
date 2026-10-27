@@ -370,8 +370,8 @@ internal sealed class YouTubePage : UserControl
             ? T("Đang kết nối và tải danh sách đăng ký…", "Connecting and loading your subscriptions…")
             : _loadedOnce
                 ? T("Không tìm thấy kênh đăng ký nào.", "No subscribed channels found.")
-                : T("Bấm \"Kết nối\": một cửa sổ Chrome riêng sẽ mở, bạn đăng nhập Google một lần.",
-                    "Press \"Connect\": a separate Chrome window opens and you sign in to Google once.");
+                : T("Bấm \"Kết nối\": một cửa sổ trình duyệt riêng sẽ mở, bạn đăng nhập Google một lần.",
+                    "Press \"Connect\": a separate browser window opens and you sign in to Google once.");
 
         _actionInfo.Text = T($"{selectedCount} đã chọn", $"{selectedCount} selected");
     }
@@ -571,13 +571,13 @@ internal sealed class YouTubePage : UserControl
         var progress = MakeProgress();
         if (_service is not null && !await _service.IsAliveAsync())
         {
-            progress.Report(T("Cửa sổ Chrome của tool đã đóng — đang kết nối lại...", "The tool's Chrome window was closed — reconnecting..."));
+            progress.Report(T("Cửa sổ trình duyệt của tool đã đóng — đang kết nối lại...", "The tool's browser window was closed — reconnecting..."));
             await _service.DisposeAsync();
             _service = null;
         }
 
-        _service ??= new YouTubeService();
-        progress.Report(T("Đang mở Chrome riêng...", "Opening the separate Chrome window..."));
+        _service ??= new YouTubeService(_settings.Current.UseEmbeddedBrowser);
+        progress.Report(T("Đang mở trình duyệt riêng...", "Opening the separate browser window..."));
         await _service.ConnectAsync(progress, ct);
 
         var list = await _service.LoadSubscriptionsAsync(progress, ct);
@@ -775,8 +775,8 @@ internal sealed class YouTubePage : UserControl
 
         if (_service is null || !await _service.IsAliveAsync())
         {
-            _log.Log(T("[YouTube] Chưa kết nối, hoặc cửa sổ Chrome của tool đã đóng — bấm \"Kết nối\" / \"Tải lại\" trước.",
-                       "[YouTube] Not connected, or the tool's Chrome window was closed — press \"Connect\" / \"Reload\" first."), LogLevel.Warn);
+            _log.Log(T("[YouTube] Chưa kết nối, hoặc cửa sổ trình duyệt của tool đã đóng — bấm \"Kết nối\" / \"Tải lại\" trước.",
+                       "[YouTube] Not connected, or the tool's browser window was closed — press \"Connect\" / \"Reload\" first."), LogLevel.Warn);
             return;
         }
 

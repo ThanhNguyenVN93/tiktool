@@ -133,7 +133,7 @@ public sealed class MainForm : Form
         _trayIcon.DoubleClick += (_, _) => RestoreFromTray();
     }
 
-    private static Icon LoadAppIcon()
+    internal static Icon LoadAppIcon()
     {
         try
         {

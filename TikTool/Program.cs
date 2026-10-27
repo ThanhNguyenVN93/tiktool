@@ -36,6 +36,7 @@ internal static class Program
         Application.DoEvents();
 
         var main = new Forms.MainForm();
+        Browser.UiThread.Initialize(main);
 
         ThreadPool.RegisterWaitForSingleObject(showSignal, (_, _) =>
         {
