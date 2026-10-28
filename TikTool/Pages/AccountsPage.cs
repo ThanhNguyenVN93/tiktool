@@ -345,7 +345,7 @@ internal sealed class AccountsPage : UserControl
         }
         catch (Exception ex)
         {
-            AppLog.Write("WARN", "AccountsPage TikTok poll: " + ex.Message);
+            AppLog.Write("WARN", "AccountsPage TikTok poll: " + ex.Message, LogCategory.TikTok);
         }
         finally
         {
@@ -469,7 +469,7 @@ internal sealed class AccountsPage : UserControl
         }
         catch (Exception ex)
         {
-            AppLog.Write("WARN", "AccountsPage YouTube poll: " + ex.Message);
+            AppLog.Write("WARN", "AccountsPage YouTube poll: " + ex.Message, LogCategory.YouTube);
         }
         finally
         {

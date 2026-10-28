@@ -184,7 +184,7 @@ internal sealed class UnfollowPage : UserControl
     {
         var body = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Background };
 
-        _log = new LogPanel { Dock = DockStyle.Fill };
+        _log = new LogPanel { Dock = DockStyle.Fill, Category = LogCategory.TikTok };
         var logHost = new Panel { Dock = DockStyle.Bottom, Height = 116, Padding = new Padding(20, 0, 20, 16), BackColor = Theme.Background };
         logHost.Controls.Add(_log);
 

@@ -111,6 +111,7 @@ internal sealed class SettingsPage : UserControl
         flow.Controls.Add(BuildGroup(T("TẢI VIDEO", "DOWNLOAD"), BuildDownloadRows()));
         flow.Controls.Add(BuildGroup(T("BỎ THEO DÕI", "UNFOLLOW"), BuildUnfollowRows()));
         flow.Controls.Add(BuildGroup(T("TRÌNH DUYỆT", "BROWSER"), BuildBrowserRows()));
+        flow.Controls.Add(BuildGroup(T("NHẬT KÝ", "LOGS"), BuildLogRows()));
         flow.Controls.Add(BuildGroup(T("GIAO DIỆN && HỆ THỐNG", "INTERFACE && SYSTEM"), BuildAppRows()));
         flow.Controls.Add(BuildGroup(T("NGÔN NGỮ", "LANGUAGE"), BuildLanguageRows()));
 
@@ -267,6 +268,32 @@ internal sealed class SettingsPage : UserControl
                   "No Chrome needed: TikTok and YouTube run in an app window (needs WebView2, included with Windows 11). Sign in on the Accounts tab. Applies the next time you run."), _embeddedBrowserToggle),
         };
     }
+    private List<Control> BuildLogRows()
+    {
+        var open = new Guna2Button
+        {
+            Text = T("Mở thư mục", "Open folder"),
+            Font = Theme.FontMedium,
+            Size = new Size(130, 28),
+            FillColor = ColorTranslator.FromHtml("#2a2a2a"),
+            ForeColor = Theme.TextSecondary,
+            BorderRadius = 7,
+            Cursor = Cursors.Hand,
+        };
+        open.Click += (_, _) =>
+        {
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = AppPaths.LogDir, UseShellExecute = true }); }
+            catch (Exception ex) { AppLog.Write("WARN", "Could not open the log folder: " + ex.Message); }
+        };
+
+        return new List<Control>
+        {
+            BuildRow("📂", T("Thư mục nhật ký", "Log folder"),
+                T("tiktok.log, youtube.log, challenges.log (captcha), update.log, download.log, errors.log. Chỉ nằm trên máy bạn; xem qua trước khi gửi cho ai.",
+                  "tiktok.log, youtube.log, challenges.log (captchas), update.log, download.log, errors.log. They stay on this computer; look them over before sending them to anyone."), open),
+        };
+    }
+
     private List<Control> BuildAppRows()
     {
         _startWithWindowsToggle = BuildToggle();

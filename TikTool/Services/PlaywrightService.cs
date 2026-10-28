@@ -418,7 +418,7 @@ public sealed class PlaywrightService : IAsyncDisposable
             }
             catch (Exception ex) when (ct.IsCancellationRequested == false)
             {
-                AppLog.Write("WARN", $"Open Following panel attempt {attempt + 1} failed: {ex.GetType().Name}: {ex.Message}");
+                AppLog.Write("WARN", $"Open Following panel attempt {attempt + 1} failed: {ex.GetType().Name}: {ex.Message}", LogCategory.TikTok);
                 if (attempt < 2)
                 {
                     log?.Report(T($"[Unfollow] Chưa mở được danh sách Following ({ex.Message}), thử lại (lần {attempt + 2})...",
