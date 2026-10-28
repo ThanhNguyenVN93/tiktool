@@ -7,6 +7,16 @@ internal static class Program
     [STAThread]
     static void Main()
     {
+        // One window only: two copies would fight over the Chrome debug port and the YouTube profile. A second launch just
+        // asks the running copy to come to the front, then exits.
+        using var instanceLock = new Mutex(true, @"Local\SocialToolkit.SingleInstance", out var isFirstInstance);
+        using var showSignal = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\SocialToolkit.Show");
+        if (!isFirstInstance)
+        {
+            showSignal.Set();
+            return;
+        }
+
         ApplicationConfiguration.Initialize();
         AppLog.Initialize();
         Application.ThreadException += (_, e) => AppLog.Write("FATAL", e.Exception.ToString());
@@ -26,6 +36,14 @@ internal static class Program
         Application.DoEvents();
 
         var main = new Forms.MainForm();
+
+        ThreadPool.RegisterWaitForSingleObject(showSignal, (_, _) =>
+        {
+            if (main.IsHandleCreated && !main.IsDisposed)
+            {
+                main.BeginInvoke(main.BringToFrontFromAnotherInstance);
+            }
+        }, null, Timeout.Infinite, false);
 
         splash.CloseWhenReady(main);
         Application.Run(main);

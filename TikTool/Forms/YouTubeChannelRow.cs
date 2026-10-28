@@ -200,12 +200,17 @@ public sealed class YouTubeChannelRow : Guna2Panel
         }
         else if (Channel.NoVideos)
         {
-            parts.Add(T("chưa có video", "no videos"));
+            parts.Add(Channel.HasShorts ? T("chỉ có Shorts", "Shorts only") : T("chưa có video", "no videos"));
         }
         else if (!string.IsNullOrEmpty(Channel.LastUploadText))
         {
             var age = FormatAge(Channel.LastUploadText);
             parts.Add(T($"video mới nhất {age.Vi}", $"latest video {age.En}"));
+        }
+
+        if (Channel.HasShorts && !Channel.NoVideos)
+        {
+            parts.Add(T("có Shorts", "posts Shorts"));
         }
 
         if (!string.IsNullOrEmpty(Channel.Subscribers))
@@ -216,30 +221,7 @@ public sealed class YouTubeChannelRow : Guna2Panel
         return string.Join(" · ", parts);
     }
 
-    /// <summary>YouTube writes the age as "13h ago", "5d ago", "9mo ago", "3y ago" (or in full words). Shown as a normal sentence in the chosen language;
-    /// the figure is coarse, hence "about".</summary>
-    private static (string Vi, string En) FormatAge(string text)
-    {
-        var m = System.Text.RegularExpressions.Regex.Match(text ?? "", @"^(\d+)\s*(second|minute|hour|day|week|month|year|sec|min|mo|[smhdwy])s?\s+ago$");
-        if (!m.Success)
-        {
-            return (text ?? "", text ?? "");
-        }
-
-        var n = int.Parse(m.Groups[1].Value);
-        var (vi, en) = m.Groups[2].Value.ToLowerInvariant() switch
-        {
-            "y" or "year" => ("năm", "year"),
-            "mo" or "month" => ("tháng", "month"),
-            "w" or "week" => ("tuần", "week"),
-            "d" or "day" => ("ngày", "day"),
-            "h" or "hour" => ("giờ", "hour"),
-            "m" or "min" or "minute" => ("phút", "minute"),
-            _ => ("giây", "second"),
-        };
-        var approx = en is "year" or "month" or "week";
-        return ((approx ? "khoảng " : "") + $"{n} {vi} trước", $"{(approx ? "about " : "")}{n} {en}{(n == 1 ? "" : "s")} ago");
-    }
+    private static (string Vi, string En) FormatAge(string text) => TikTool.Services.AgeText.Format(text);
 
     private string BadgeText() => Channel.Status switch
     {
@@ -247,6 +229,7 @@ public sealed class YouTubeChannelRow : Guna2Panel
         YouTubeChannelStatus.Done => T("✓ Đã hủy đăng ký", "✓ Unsubscribed"),
         YouTubeChannelStatus.Failed => T("✗ Lỗi", "✗ Error"),
         _ => !Channel.AgeChecked ? T("Chưa kiểm tra", "Not checked")
+            : Channel.IsUncertain ? T("Có Shorts — chưa rõ", "Has Shorts — unclear")
             : Channel.IsInactive ? T("Không hoạt động", "Inactive")
             : T("Đang hoạt động", "Active"),
     };
@@ -256,7 +239,8 @@ public sealed class YouTubeChannelRow : Guna2Panel
         YouTubeChannelStatus.Unsubscribing => Theme.Accent,
         YouTubeChannelStatus.Done => Theme.Green,
         YouTubeChannelStatus.Failed => ColorTranslator.FromHtml("#f87171"),
-        _ => Channel.AgeChecked && Channel.IsInactive ? ColorTranslator.FromHtml("#f87171") : Theme.TextMuted,
+        _ => Channel.AgeChecked && Channel.IsUncertain ? Theme.Orange
+            : Channel.AgeChecked && Channel.IsInactive ? ColorTranslator.FromHtml("#f87171") : Theme.TextMuted,
     };
 
     private static Image? LoadImage(string path)

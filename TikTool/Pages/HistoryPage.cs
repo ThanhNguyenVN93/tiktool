@@ -1,4 +1,4 @@
-using Guna.UI2.WinForms;
+﻿using Guna.UI2.WinForms;
 using TikTool.Forms;
 using TikTool.Models;
 using TikTool.Services;
@@ -27,6 +27,10 @@ internal sealed class HistoryPage : UserControl
         BackColor = Theme.Background;
         BuildUi();
         Load += (_, _) => RefreshList();
+        VisibleChanged += (_, _) =>
+        {
+            if (Visible && IsHandleCreated) RefreshList();
+        };
     }
 
     private void BuildUi()
@@ -131,13 +135,17 @@ internal sealed class HistoryPage : UserControl
 
         var iconLabel = new Label { Text = icon, Font = new Font("Segoe UI Emoji", 14f), AutoSize = true, Location = new Point(12, 10), BackColor = Theme.Panel };
         var valueLabel = new Label { Text = "0", Font = new Font("Segoe UI", 16f, FontStyle.Bold), ForeColor = Color.White, AutoSize = true, Location = new Point(12, 32), BackColor = Theme.Panel };
-        var titleLabel = new Label { Text = title, Font = new Font("Segoe UI", 7.5f), ForeColor = Theme.TextMuted, AutoSize = true, Location = new Point(46, 14), BackColor = Theme.Panel };
+        var titleLabel = new Label { Text = title, Font = new Font("Segoe UI", 7.5f), ForeColor = Theme.TextMuted, AutoSize = true, Location = new Point(58, 14), BackColor = Theme.Panel };
 
         card.Controls.Add(iconLabel);
         card.Controls.Add(titleLabel);
         card.Controls.Add(valueLabel);
         return (card, valueLabel);
     }
+
+    /// <summary>Details are stored in the language the app had at the time; the one fixed phrase we write is shown in the current language.</summary>
+    private static string LocalizeDetail(string detail) =>
+        detail is "No videos" or "Không có video" ? T("Không có video", "No videos") : detail;
 
     private Control BuildFilterRow()
     {
@@ -164,7 +172,7 @@ internal sealed class HistoryPage : UserControl
             Text = text,
             Tag = key,
             Font = Theme.FontMedium,
-            Size = new Size(90, 28),
+            Size = new Size(Math.Max(84, TextRenderer.MeasureText(text, Theme.FontMedium).Width + 36), 28),
             Margin = new Padding(0, 0, 8, 0),
             FillColor = key == _activeFilter ? Theme.Accent : ColorTranslator.FromHtml("#1a1a1a"),
             ForeColor = key == _activeFilter ? Color.White : Theme.TextSecondary,
@@ -293,7 +301,7 @@ internal sealed class HistoryPage : UserControl
         var now = DateTime.Now;
         return _activeFilter switch
         {
-            "unfollow" => all.Where(i => i.Type == "Unfollow").ToList(),
+            "unfollow" => all.Where(i => i.Type is "Unfollow" or "Unsubscribe").ToList(),
             "today" => all.Where(i => i.Timestamp.Date == now.Date).ToList(),
             "week" => all.Where(i => i.Timestamp >= now.AddDays(-7)).ToList(),
             "month" => all.Where(i => i.Timestamp >= now.AddMonths(-1)).ToList(),
@@ -305,7 +313,7 @@ internal sealed class HistoryPage : UserControl
     {
         var all = _historyService.Items;
         _statDownloads.Text = all.Count(i => i.Type == "Download").ToString();
-        _statUnfollows.Text = all.Count(i => i.Type == "Unfollow").ToString();
+        _statUnfollows.Text = all.Count(i => i.Success && (i.Type is "Unfollow" or "Unsubscribe")).ToString();
 
         var totalBytes = all.Sum(i => i.FileSizeBytes);
         _statSize.Text = $"{totalBytes / 1024.0 / 1024.0 / 1024.0:0.00} GB";
@@ -314,6 +322,8 @@ internal sealed class HistoryPage : UserControl
     private Control BuildHistoryRow(HistoryItem item)
     {
         var isUnfollow = item.Type == "Unfollow" && item.Success;
+        var youTubeUrl = item.Type == "Unsubscribe" && item.Success ? ExtractYouTubeUrl(item.Detail) : null;
+        var hasUndo = isUnfollow || youTubeUrl is not null;
         var row = new Guna2Panel
         {
             Width = ContentWidth,
@@ -329,7 +339,7 @@ internal sealed class HistoryPage : UserControl
         var iconLabel = new Label { Text = icon, Font = new Font("Segoe UI Emoji", 12f), Size = new Size(28, 28), Location = new Point(10, 10), TextAlign = ContentAlignment.MiddleCenter, BackColor = Theme.Panel };
 
         // Unfollow rows with a "Follow lại" button need less width for title
-        var titleWidth = isUnfollow ? ContentWidth - 370 : ContentWidth - 320;
+        var titleWidth = hasUndo ? ContentWidth - 370 : ContentWidth - 320;
 
         var titleLabel = new Label
         {
@@ -344,7 +354,7 @@ internal sealed class HistoryPage : UserControl
         };
         var detailLabel = new Label
         {
-            Text = item.Detail,
+            Text = LocalizeDetail(item.Detail),
             Font = new Font("Segoe UI", 7.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = false,
@@ -409,7 +419,34 @@ internal sealed class HistoryPage : UserControl
             row.Controls.Add(btnRefollow);
         }
 
+        if (youTubeUrl is not null)
+        {
+            var btnResubscribe = new Guna2Button
+            {
+                Text = T("↩ Đăng ký lại", "↩ Re-subscribe"),
+                Font = Theme.FontLabel,
+                Size = new Size(96, 26),
+                Location = new Point(ContentWidth - 284, 11),
+                FillColor = ColorTranslator.FromHtml("#1a1a1a"),
+                ForeColor = Theme.TextSecondary,
+                BorderRadius = 6,
+                Cursor = Cursors.Hand,
+            };
+            btnResubscribe.Click += (_, _) =>
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = youTubeUrl, UseShellExecute = true });
+            };
+            row.Controls.Add(btnResubscribe);
+        }
+
         return row;
+    }
+
+    /// <summary>A YouTube unsubscribe is stored as "YouTube · {channel link}" (plus " · error" when it failed).</summary>
+    private static string? ExtractYouTubeUrl(string detail)
+    {
+        var parts = (detail ?? "").Split(" · ");
+        return parts.Length >= 2 && parts[0] == "YouTube" && parts[1].StartsWith("http", StringComparison.OrdinalIgnoreCase) ? parts[1] : null;
     }
 
     private async Task ClearHistoryAsync()

@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using Guna.UI2.WinForms;
 using TikTool.Forms;
@@ -259,19 +259,21 @@ internal sealed class YouTubePage : UserControl
         {
             Font = Theme.FontLabel,
             ForeColor = ColorTranslator.FromHtml("#444444"),
-            AutoSize = true,
+            AutoSize = false,
+            AutoEllipsis = true,
+            Size = new Size(Math.Max(120, ContentWidth - 150 - 8 - 205 - 8 - 215 - 12), 18),
             Location = new Point(0, 6),
         };
 
         _btnConnect = MakeButton("", new Size(150, 28), new Point(ContentWidth - 150, 0), Theme.Accent, Color.White);
         _btnConnect.Click += async (_, _) => await ConnectAndLoadAsync();
 
-        _btnSelectInactive = MakeButton(T("💤  Chọn không hoạt động", "💤  Select inactive"), new Size(170, 28),
-            new Point(ContentWidth - 150 - 8 - 170, 0), quiet, Theme.TextSecondary);
+        _btnSelectInactive = MakeButton(T("💤  Chọn không hoạt động", "💤  Select inactive"), new Size(205, 28),
+            new Point(ContentWidth - 150 - 8 - 205, 0), quiet, Theme.TextSecondary);
         _btnSelectInactive.Click += (_, _) => SelectInactive();
 
-        _btnSelectShown = MakeButton(T("☑  Chọn tất cả đang hiện", "☑  Select all shown"), new Size(170, 28),
-            new Point(ContentWidth - 150 - 8 - 170 - 8 - 170, 0), quiet, Theme.TextSecondary);
+        _btnSelectShown = MakeButton(T("☑  Chọn tất cả đang hiện", "☑  Select all shown"), new Size(215, 28),
+            new Point(ContentWidth - 150 - 8 - 205 - 8 - 215, 0), quiet, Theme.TextSecondary);
         _btnSelectShown.Click += (_, _) => SelectShown();
 
         _emptyHint = new Label
@@ -351,7 +353,7 @@ internal sealed class YouTubePage : UserControl
         var anyInactive = _channels.Any(c => c.IsInactive && !c.IsProtected && c.Status != YouTubeChannelStatus.Done);
 
         _btnConnect.Enabled = !_isBusy;
-        _btnConnect.Text = _loadedOnce ? T("🔄  Tải lại", "🔄  Reload") : T("🔌  Kết nối & tải", "🔌  Connect & load");
+        _btnConnect.Text = _loadedOnce ? T("🔄  Tải lại", "🔄  Reload") : T("🔌  Kết nối", "🔌  Connect");
         _btnSelectInactive.Enabled = !_isBusy && anyInactive;
         _btnSelectShown.Enabled = !_isBusy && hasChannels;
         _btnClear.Enabled = !_isBusy && _channels.Any(c => c.IsSelected);
@@ -368,8 +370,8 @@ internal sealed class YouTubePage : UserControl
             ? T("Đang kết nối và tải danh sách đăng ký…", "Connecting and loading your subscriptions…")
             : _loadedOnce
                 ? T("Không tìm thấy kênh đăng ký nào.", "No subscribed channels found.")
-                : T("Bấm \"Kết nối & tải\": một cửa sổ Chrome riêng sẽ mở, bạn đăng nhập Google một lần.",
-                    "Press \"Connect & load\": a separate Chrome window opens and you sign in to Google once.");
+                : T("Bấm \"Kết nối\": một cửa sổ Chrome riêng sẽ mở, bạn đăng nhập Google một lần.",
+                    "Press \"Connect\": a separate Chrome window opens and you sign in to Google once.");
 
         _actionInfo.Text = T($"{selectedCount} đã chọn", $"{selectedCount} selected");
     }
@@ -412,7 +414,9 @@ internal sealed class YouTubePage : UserControl
         var days = ThresholdDays[Math.Max(0, _criteriaCombo.SelectedIndex)];
         foreach (var c in _channels)
         {
-            c.IsInactive = c.AgeChecked && (c.NoVideos || (c.DaysSinceLastUpload ?? 0) >= days);
+            // Shorts show no dates: old long videos + a Shorts tab means we cannot tell, so it is not called inactive.
+            c.IsUncertain = c.AgeChecked && c.HasShorts && (c.NoVideos || (c.DaysSinceLastUpload ?? 0) >= 30);
+            c.IsInactive = c.AgeChecked && !c.IsUncertain && (c.NoVideos || (c.DaysSinceLastUpload ?? 0) >= days);
         }
     }
 
@@ -565,6 +569,13 @@ internal sealed class YouTubePage : UserControl
     private Task ConnectAndLoadAsync() => RunBusyAsync(async ct =>
     {
         var progress = MakeProgress();
+        if (_service is not null && !await _service.IsAliveAsync())
+        {
+            progress.Report(T("Cửa sổ Chrome của tool đã đóng — đang kết nối lại...", "The tool's Chrome window was closed — reconnecting..."));
+            await _service.DisposeAsync();
+            _service = null;
+        }
+
         _service ??= new YouTubeService();
         progress.Report(T("Đang mở Chrome riêng...", "Opening the separate Chrome window..."));
         await _service.ConnectAsync(progress, ct);
@@ -580,6 +591,7 @@ internal sealed class YouTubePage : UserControl
                 c.LastUploadUnix = cached.LastUploadUnix;
                 c.LastUploadText = cached.Text;
                 c.NoVideos = cached.NoVideos;
+                c.HasShorts = cached.HasShorts;
                 c.AgeChecked = true;
             }
         }
@@ -623,8 +635,9 @@ internal sealed class YouTubePage : UserControl
                     channel.LastUploadUnix = age.LastUploadUnix;
                     channel.LastUploadText = age.Text;
                     channel.NoVideos = age.NoVideos;
+                    channel.HasShorts = age.HasShorts;
                     channel.AgeChecked = true;
-                    _store.SetAge(channel.Url, age.LastUploadUnix, age.Text, age.NoVideos);
+                    _store.SetAge(channel.Url, age.LastUploadUnix, age.Text, age.NoVideos, age.HasShorts);
                     streak = 0;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -643,7 +656,7 @@ internal sealed class YouTubePage : UserControl
                 RecomputeInactive();
                 RefreshRow(channel);
                 done++;
-                _progressText = T($"đang đọc ngày đăng {done}/{todo.Count} ({done * 100 / todo.Count}%)", $"reading upload dates {done}/{todo.Count} ({done * 100 / todo.Count}%)");
+                _progressText = T($"đang đọc ngày {done}/{todo.Count}", $"reading dates {done}/{todo.Count}");
                 UpdateSectionLabel(_rows.Count);
                 if (done % 10 == 0)
                 {
@@ -760,9 +773,10 @@ internal sealed class YouTubePage : UserControl
                        $"[YouTube] Per-run limit: {limit} channels — the other {allSelected.Count - selected.Count} wait for the next run."), LogLevel.Warn);
         }
 
-        if (_service is null || !_service.IsConnected)
+        if (_service is null || !await _service.IsAliveAsync())
         {
-            _log.Log(T("[YouTube] Chưa kết nối YouTube — bấm \"Kết nối & tải\" trước.", "[YouTube] Not connected to YouTube — press \"Connect & load\" first."), LogLevel.Warn);
+            _log.Log(T("[YouTube] Chưa kết nối, hoặc cửa sổ Chrome của tool đã đóng — bấm \"Kết nối\" / \"Tải lại\" trước.",
+                       "[YouTube] Not connected, or the tool's Chrome window was closed — press \"Connect\" / \"Reload\" first."), LogLevel.Warn);
             return;
         }
 

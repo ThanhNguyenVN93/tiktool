@@ -31,7 +31,7 @@ internal sealed class SplashForm : Form
 
         var lblSub = new Label
         {
-            Text      = "Download & clean up your social accounts",
+            Text      = "Download && clean up your social accounts",
             Font      = new Font("Segoe UI", 9),
             ForeColor = Theme.TextMuted,
             AutoSize  = true,

@@ -1,336 +1,82 @@
-# TikTool — CLAUDE.md
+# Social Toolkit (thư mục code: TikTool) — CLAUDE.md
 
-> **Dành cho Claude Code**: Đây là handoff đầy đủ cho project TikTool. Đọc hết file này trước khi làm bất cứ thứ gì.
+> Dành cho Claude Code. Đọc hết trước khi sửa. Viết lại 2026-10-27 sau một ngày chạy thật với tài khoản thật; mọi thứ ghi "đã kiểm chứng" nghĩa là đã thấy chạy đúng, không phải suy đoán.
 
-## Tổng quan project
+## 1. Dự án là gì
+Windows desktop app (.NET 8 WinForms + Guna.UI2), tên hiển thị **Social Toolkit** (tên nội bộ, namespace, exe, thư mục dữ liệu vẫn là `TikTool` — **không đổi**, đổi sẽ làm người dùng mất dữ liệu). Tác giả: ThanhCode93 (GitHub `ThanhNguyenVN93/tiktool`). Ba nhóm chức năng:
 
-**TikTool** là Windows desktop app (.NET 8 WinForms + Guna.UI2) gồm 2 chức năng chính:
-1. **Download video** TikTok/Instagram Reels không watermark (dùng yt-dlp.exe bundled)
-2. **Unfollow kênh chết** TikTok — load danh sách following qua Playwright (Chromium headless), phát hiện kênh 0 video, unfollow qua API hoặc click trình duyệt
+1. **Download** video TikTok/Instagram không watermark (gọi `yt-dlp.exe`, không dùng NuGet wrapper).
+2. **TikTok Unfollow**: tải danh sách Following, tìm kênh "không hoạt động" (0 video, hoặc lâu không đăng), unfollow có xác nhận.
+3. **YouTube Unsubscribe**: tải danh sách đăng ký, đọc ngày đăng video mới nhất, tìm kênh không hoạt động, hủy đăng ký có xác nhận + sao lưu CSV.
 
-**Tác giả**: ThanhCode93 (GitHub: ThanhNguyenVN93)  
-**Project folder**: `D:\code\frm_tiktool\`  
-**Solution**: `TikTool.sln` → project `TikTool/TikTool.csproj` (.NET 8, WinForms, target `net8.0-windows`)
+Thuật ngữ: dùng **"kênh không hoạt động / inactive"**, KHÔNG dùng "kênh chết / dead" ở bất cứ chữ nào người dùng thấy (0 video không có nghĩa là chết: có thể là người thật, kể cả bạn bè). Tên biến nội bộ (`IsDead`, `SelectAllDead`) giữ nguyên.
 
----
-
-## Trạng thái hiện tại (quan trọng — đọc kỹ trước khi sửa gì)
-
-**Tất cả 6 bước đã có code, build `dotnet build TikTool.sln` = 0 lỗi 0 warning.**
-
-Nhưng nhiều phần **chưa test thực tế** với tài khoản TikTok thật. Chi tiết từng phần xem `PROGRESS.md` trong gốc project.
-
-### Những gì đã chắc chắn hoạt động (đã test thật)
-- Đọc/decrypt cookie Chrome/Edge (SQLite + AES-256-GCM + DPAPI), xử lý nhiều profile
-- Dán cookie thủ công + verify qua mạng
-- Lưu/nạp/xoá cookie mã hoá DPAPI tại `%APPDATA%\TikTool\cookie.json`
-- Điều hướng 5 tab sidebar ổn định
-- Tự động đóng Chrome/Edge khi file cookie bị khoá (hỏi confirm trước)
-- `YtDlpService` + `SettingsService` + `HistoryService` + `UpdateService` logic đúng
-- DOM/API TikTok xác nhận: `__UNIVERSAL_DATA_FOR_REHYDRATION__` script tồn tại, field `userInfo.user.id` / `userInfo.stats.videoCount` đúng
-
-### Chưa test được (cần tài khoản TikTok thật + môi trường đúng)
-- **Playwright/Chromium headless**: `InstallBrowserIfNeeded()` tải Chromium ~300MB, `LoadFollowingListAsync()` scroll + parse, `ClickUnfollowAsync()` click nút
-- **Selectors TikTok** trong `Config/selectors.json`: `following_item`, `following_username`, `unfollow_btn`, `confirm_unfollow_btn` — đây là suy đoán theo brief, **phải dò lại bằng DevTools trên tài khoản thật**
-- **yt-dlp download thật**: tải video thật, parse progress regex, ffmpeg merge
-- **Rate limit flow**: HTTP 429 hoặc `status_code:2061` từ API unfollow
-- **`SelectorsUrl`** trong `UpdateService.cs` trỏ repo placeholder `ThanhNguyenVN93/tiktool` — repo này chưa tồn tại, sẽ log lỗi 404 mỗi lần mở app (vô hại, đã try/catch)
-
----
-
-## Cấu trúc file
-
-```
-D:\code\frm_tiktool\
-├── TikTool.sln
-├── PROGRESS.md                  ← lịch sử làm, đọc trước khi sửa gì
-├── TEST_CHECKLIST.md            ← checklist test thực tế
-├── FIX_COOKIEPAGE.md            ← ghi chú bug UI đã fix
-├── files/
-│   ├── TIKTOOL_BRIEF.md         ← spec gốc
-│   ├── tiktok-tool-ui.html      ← demo UI tham khảo
-│   └── tiktok-tool-flowchart.mermaid
-└── TikTool/
-    ├── TikTool.csproj           ← .NET 8, Guna.UI2 + Playwright + Sqlite + DPAPI
-    ├── Program.cs
-    ├── Config/
-    │   └── selectors.json       ← CSS selectors TikTok (cần dò lại với DOM thật)
-    ├── Forms/
-    │   ├── MainForm.cs          ← sidebar + content area, inject services vào pages
-    │   ├── NavItem.cs           ← Guna2Button custom, active state #ff2d55
-    │   ├── Theme.cs             ← color tokens
-    │   ├── LogPanel.cs          ← log panel tái dùng (info/ok/warn/error)
-    │   ├── CookieMethodCard.cs  ← accordion card cho CookiePage
-    │   ├── DownloadQueueItemRow.cs ← row queue download
-    │   └── FollowingItemControl.cs ← row kênh following
-    ├── Models/
-    │   ├── AppSettings.cs
-    │   ├── DownloadItem.cs
-    │   ├── DownloadProgress.cs
-    │   ├── FollowingAccount.cs
-    │   ├── HistoryItem.cs
-    │   ├── SelectorsConfig.cs
-    │   └── TikTokCookie.cs
-    ├── Pages/
-    │   ├── DownloadPage.cs      ← Tab Download (564 dòng)
-    │   ├── UnfollowPage.cs      ← Tab Unfollow kênh chết
-    │   ├── CookiePage.cs        ← Tab Cookie (3 phương thức)
-    │   ├── SettingsPage.cs      ← Tab Cài đặt
-    │   ├── HistoryPage.cs       ← Tab Lịch sử
-    │   └── PlaceholderPage.cs
-    ├── Resources/
-    │   ├── yt-dlp.exe           ← KHÔNG commit vào git, copy thủ công
-    │   └── ffmpeg.exe           ← KHÔNG commit vào git, copy thủ công
-    └── Services/
-        ├── AppPaths.cs          ← %APPDATA%\TikTool\*
-        ├── CookieService.cs     ← đọc Chrome/Edge cookie, DPAPI encrypt
-        ├── HistoryService.cs    ← ghi lịch sử download/unfollow
-        ├── PlaywrightService.cs ← Chromium headless, load following list
-        ├── SelectorsService.cs  ← đọc + cache selectors.json
-        ├── SettingsService.cs   ← đọc/ghi settings.json
-        ├── TikTokApiService.cs  ← API unfollow + GetUserDetail (dùng UNIVERSAL_DATA)
-        ├── UpdateService.cs     ← tự động update yt-dlp + selectors.json từ GitHub
-        └── YtDlpService.cs      ← wrapper yt-dlp.exe
-```
-
----
-
-## Tech stack
-
-| Package | Version | Dùng cho |
-|---------|---------|----------|
-| `Guna.UI2.WinForms` | 2.0.4.6 | UI controls (button, toggle, card) |
-| `Microsoft.Playwright` | 1.47.0 | Chromium headless, load following list |
-| `Microsoft.Data.Sqlite` | 8.0.10 | Đọc cookie database Chrome/Edge |
-| `System.Security.Cryptography.ProtectedData` | 8.0.0 | DPAPI decrypt cookie key |
-
-**Không dùng**: yt-dlp NuGet wrapper — gọi thẳng `yt-dlp.exe` qua `System.Diagnostics.Process` để có full control output parsing.
-
----
-
-## Kiến trúc quan trọng
-
-### 1. Dependency injection thủ công (MainForm constructor)
-Thứ tự khởi tạo service trong `MainForm.cs` — **không được đảo thứ tự**:
-```
-SettingsService → CookieService → YtDlpService → PlaywrightService
-→ TikTokApiService → HistoryService → UpdateService
-```
-Mỗi page nhận service qua constructor, không tự `new()`.
-
-### 2. WinForms Dock layout — quy tắc bắt buộc
-`Dock=Fill` phải được `Controls.Add()` **trước** mọi `Dock=Top/Bottom/Left/Right`. Làm ngược = Fill resolve sai → UI chồng lên nhau. Áp dụng nhất quán trong mọi Page.
-
-### 3. yt-dlp.exe resolve logic (`YtDlpService.ResolveExecutable`)
-```
-1. Resources\yt-dlp.exe (cạnh exe build output)
-2. PATH system
-→ Không tìm thấy = throw, hiển thị friendly error
-```
-ffmpeg: không bắt buộc — thiếu chỉ warn, không crash (một số format cần ffmpeg mới merge được).
-
-### 4. Cookie flow
-```
-Chrome/Edge SQLite → DPAPI decrypt AES key → AES-256-GCM decrypt cookie value
-→ Lưu mã hoá DPAPI tại %APPDATA%\TikTool\cookie.json
-→ Truyền raw cookie string vào Playwright AddCookiesAsync (domain .tiktok.com)
-→ Truyền raw cookie string vào TikTokApiService header
-```
-
-### 5. GetUserDetail — dùng `__UNIVERSAL_DATA_FOR_REHYDRATION__`
-**KHÔNG dùng API `user_detail_api` nữa** (TikTok trả 200 rỗng vì thiếu chữ ký chống-bot).  
-Thay bằng `PlaywrightService.GetUserDetailAsync`: mở trang profile `https://www.tiktok.com/@{username}`, đọc script `__UNIVERSAL_DATA_FOR_REHYDRATION__` nhúng sẵn trong HTML, parse JSON.  
-Field đúng đã xác nhận: `userInfo.user.id`, `userInfo.stats.videoCount`.
-
-### 6. Unfollow strategy
-```
-Nếu chế độ = "API trước" VÀ có UserId:
-  POST api_unfollow_endpoint với header Cookie
-  → HTTP 429 hoặc body status_code:2061 = RateLimitException
-  → Hỏi user (nếu NotifyOnRateLimit=true) → tiếp tục thì đợi 10s, fallback Playwright
-  → Lỗi khác = fallback Playwright
-
-Playwright fallback:
-  Mở trang profile @username → click unfollow_btn → click confirm_unfollow_btn
-
-Delay giữa các account: random(UnfollowDelayMinMs, UnfollowDelayMaxMs) từ Settings
-Session limit: UnfollowSessionLimit (bỏ qua phần còn lại nếu vượt)
-```
-
----
-
-## selectors.json — cần dò lại với DOM thật
-
-File `Config/selectors.json` hiện tại dùng selector suy đoán. **Trước khi test Playwright**, mở TikTok trên Chrome, đăng nhập, vào trang Following, dùng DevTools kiểm tra và cập nhật:
-
-```json
-{
-  "Version": "1.0.0",
-  "FollowingPageUrl": "https://www.tiktok.com/following",
-  "FollowingItem": "[data-e2e='follow-item']",        ← CẦN DÒ LẠI
-  "FollowingUsername": "[data-e2e='follow-item'] a",  ← CẦN DÒ LẠI
-  "UnfollowBtn": "[data-e2e='follow-button']",        ← CẦN DÒ LẠI
-  "ConfirmUnfollowBtn": "[data-e2e='unfollow-popup-unfollow-btn']", ← CẦN DÒ LẠI
-  "ApiUnfollowEndpoint": "https://www.tiktok.com/api/relation/user/unfollow/",
-  "CookieVerifyEndpoint": "https://www.tiktok.com/api/user/detail/?uniqueId=tiktok"
-}
-```
-
-Sau khi dò đúng selector, tăng `Version` lên `"1.0.1"` rồi push lên GitHub (nếu đã tạo repo) để `UpdateService` phân phối selector mới tự động.
-
----
-
-## Những việc cần làm (TODO list)
-
-### 🔴 Quan trọng / blocking
-
-1. **Test Playwright thật**
-   - Cài Chromium: `dotnet run` lần đầu → `InstallBrowserIfNeeded()` tự chạy (~300MB download)
-   - Đăng nhập TikTok trong cookie, bấm "Tải lại" trong tab Unfollow
-   - Quan sát log để xem `LoadFollowingListAsync` có scroll và parse đúng không
-   - Nếu không parse được = selector sai → dò lại bằng DevTools, sửa `selectors.json`
-
-2. **Xác nhận selector unfollow**
-   - Sau khi có danh sách kênh, chọn 1 kênh test, bấm Unfollow
-   - Kiểm tra `unfollow_btn` và `confirm_unfollow_btn` selector có click đúng không
-   - Quan sát có bị rate limit không với tài khoản test
-
-3. **Test download video**
-   - Dán URL TikTok → bấm Thêm → quan sát progress bar và log
-   - Nếu lỗi: kiểm tra `Resources\yt-dlp.exe` có tồn tại không (`YtDlpService.ResolveExecutable`)
-   - Test cả 3 format: MP4, MP3, MKV
-
-4. **Tạo repo GitHub** `ThanhNguyenVN93/tiktool` (nếu muốn dùng auto-update selector)
-   - Upload `Config/selectors.json` lên `main/config/selectors.json` trong repo đó
-   - Hoặc sửa `SelectorsUrl` trong `UpdateService.cs` sang URL khác
-
-### 🟡 Cải thiện / nice-to-have
-
-5. **`SkipFriends` còn là stub**
-   - `FollowingAccount.IsFriend` luôn = false vì chưa có selector cho badge "Follows you"
-   - Thêm selector cho badge này trong `selectors.json`
-   - Đọc badge trong `PlaywrightService.LoadFollowingListAsync`
-   - Lọc trong `UnfollowPage.StartOrStopUnfollowAsync` nếu `SkipFriends=true`
-
-6. **`FileSizeBytes` = 0 cho Download history**
-   - `YtDlpService` trả `FileSize` dạng chuỗi (`"24.30MiB"`), chưa parse ra byte
-   - Sửa để parse và điền `FileSizeBytes` vào `HistoryItem` → thống kê "Tổng GB" mới đúng
-
-7. **`ConcurrentDownloads` chưa có tác dụng**
-   - `DownloadPage.ProcessQueueAsync` vẫn tải tuần tự
-   - Nếu muốn song song: đổi sang N worker `Task` chạy cùng lúc, đọc `SettingsService.Current.ConcurrentDownloads`
-
-8. **Instagram Reels support**
-   - yt-dlp hỗ trợ Instagram sẵn, chỉ cần pass URL vào — về lý thuyết đã hoạt động
-   - Test với vài URL Instagram Reels để xác nhận
-
-### 🟢 Nhỏ / polish
-
-9. **App icon** — chưa có `.ico`, dùng icon mặc định
-10. **Splash screen** — Playwright install lần đầu mất vài phút, nên có progress indicator riêng
-11. **Tray icon** — minimize to tray khi đóng cửa sổ (setting tùy chọn)
-
----
-
-## Conventions & style guide
-
-### Tên
-- Namespace: `TikTool`
-- Form/Page class: `PascalCase` + suffix `Page` hoặc `Form`
-- Service class: `PascalCase` + suffix `Service`
-- Private field: `_camelCase`
-- Event handler: `On` + tên control + tên event (`OnBtnAddClick`)
-
-### Async
-- Mọi I/O đều `async/await`; không `Task.Result` hoặc `.Wait()`
-- Fire-and-forget trong event handler: bọc try/catch + log lỗi vào `LogPanel`
-- `CancellationToken` truyền xuyên suốt chuỗi gọi
-
-### UI thread
-- `Control.Invoke()` hoặc `BeginInvoke()` khi update UI từ background thread
-- Hoặc dùng `Progress<T>` với `IProgress<T>` như trong `YtDlpService.DownloadAsync`
-
-### Log
-- Dùng `LogPanel.AppendLog(message, LogLevel)` — không `Console.WriteLine`
-- `LogLevel`: Info / Ok / Warn / Error
-
-### Error handling
-- Service layer: throw exception có message tiếng Việt thân thiện
-- Page layer: bắt exception, log vào `LogPanel.Error()`, không popup MessageBox trừ confirm quan trọng
-- `RateLimitException` trong `UnfollowPage`: hỏi MessageBox vì cần quyết định của user
-
----
-
-## Build & run
-
+## 2. Build, test, chạy
 ```bash
-# Build
-cd D:\code\frm_tiktool
 dotnet build TikTool.sln
-
-# Run debug
+dotnet test TikTool.Tests/TikTool.Tests.csproj      # 36 test: đọc tuổi video, CSV, ngày mới nhất TikTok, parser API TikTok
 dotnet run --project TikTool/TikTool.csproj
-
-# Yêu cầu trước khi chạy
-# 1. Copy yt-dlp.exe vào TikTool/Resources/yt-dlp.exe
-# 2. Copy ffmpeg.exe vào TikTool/Resources/ffmpeg.exe (optional nhưng nên có)
-# 3. Chromium sẽ tự download lần đầu khi dùng tab Unfollow
 ```
+- Cần `TikTool/Resources/yt-dlp.exe` (và tùy chọn `ffmpeg.exe`), **không commit** `*.exe`.
+- Cần **Chrome hoặc Edge đã cài** (tool điều khiển chính trình duyệt đó, không tải Chromium).
+- Khi build kiểm tra từ công cụ khác, **dùng thư mục obj riêng** (`-p:OutDir=... -p:IntermediateOutputPath=...`) hoặc build bình thường; build ra OutDir riêng dùng chung `obj` từng làm thư mục `bin\Debug` thiếu `TikTool.deps.json` → lỗi "Could not load Microsoft.Playwright" lúc chạy. Nếu gặp: Rebuild Solution.
+- Mọi chuỗi hiển thị phải đi qua `T(vi, en)` (`LanguageService`, đã `global using static`). **Không** tự định nghĩa hàm `T` giả chỉ trả tiếng Việt (từng làm dòng kênh và trang Lịch sử bỏ qua cài đặt ngôn ngữ).
 
-**Không commit `Resources/*.exe`** — file quá lớn, user tự download.  
-yt-dlp: https://github.com/yt-dlp/yt-dlp/releases/latest  
-ffmpeg: https://github.com/BtbN/FFmpeg-Builds/releases
-
----
-
-## Luồng data chính
-
-### Download flow
+## 3. Cấu trúc
 ```
-User paste URL
-→ DownloadPage: tạo DownloadItem, thêm vào queue FlowLayoutPanel
-→ ProcessQueueAsync (tuần tự): gọi YtDlpService.DownloadAsync
-→ YtDlpService: Process yt-dlp.exe, IProgress<DownloadProgressInfo>
-→ DownloadPage: cập nhật DownloadQueueItemRow (progress bar, badge)
-→ Xong/lỗi: gọi HistoryService.AddAsync
+TikTool.sln
+TikTool/
+  Program.cs                 splash, AppLog, xử lý lỗi chưa bắt
+  Forms/   MainForm (thanh bên, nhóm "Unfollow" mở/đóng, DI thủ công), FollowingItemControl (dòng kênh TikTok),
+           YouTubeChannelRow (dòng kênh YouTube), LogPanel, NavItem, SplashForm, DonationForm, Theme
+  Pages/   DownloadPage, UnfollowPage (TikTok), YouTubePage, CookiePage, SettingsPage, HistoryPage, GuidePage
+  Services/ PlaywrightService (TikTok, CDP), YouTubeService + YouTubeStore + AgeText (YouTube),
+           CookieService (DPAPI, đừng sửa bừa), SessionStateService (phiên + whitelist + quota), LastPostCache,
+           AvatarCache, AppLog, AppPaths, SettingsService, HistoryService, UpdateService, YtDlpService, LanguageService
+  Models/  FollowingAccount, YouTubeChannel, AppSettings, HistoryItem, SessionState, TikTokCookie ...
+TikTool.Tests/               xUnit; TikTool.csproj có InternalsVisibleTo("TikTool.Tests")
 ```
+Thứ tự khởi tạo service trong `MainForm` (không đảo): Settings → Cookie → YtDlp → Playwright → TikTokApi → History → SessionState → Update. `Dock=Fill` phải `Controls.Add` TRƯỚC các control Dock Top/Bottom.
 
-### Unfollow flow
-```
-User bấm "Tải lại"
-→ UnfollowPage: load cookie từ CookieService
-→ PlaywrightService.LaunchAsync(cookie): mở Chromium, inject cookie .tiktok.com
-→ PlaywrightService.LoadFollowingListAsync(): scroll trang Following, parse username
-→ (tuần tự, 300ms delay): PlaywrightService.GetUserDetailAsync(username)
-  → mở trang profile, đọc __UNIVERSAL_DATA_FOR_REHYDRATION__
-  → parse videoCount → đánh dấu FollowingAccount.IsDead
-→ User chọn kênh muốn unfollow, bấm "Bắt đầu Unfollow"
-→ (tuần tự, random 2-5s delay): TikTokApiService.UnfollowAsync hoặc Playwright click
-→ Mỗi lần: cập nhật badge FollowingItemControl, gọi HistoryService.AddAsync
-```
+## 4. Dữ liệu người dùng (`%APPDATA%\TikTool\`)
+`cookie.dat` (DPAPI), `settings.dat`, `history.dat`, `session_resume.dat`, `whitelist.dat`, `lastpost.dat` (ngày đăng TikTok, 30 ngày), `avatars\` (logo, 30 ngày), `youtube_profile\` (**hồ sơ Chrome riêng chứa phiên Google**, xóa bằng Cài đặt → YouTube → Đăng xuất), `youtube_ages.dat` (7 ngày), `youtube_protected.dat`, `youtube_backups\*.csv`, `logs\session_*.log` (mỗi lần chạy một file mới), `debug\` (ảnh + HTML khi lỗi).
 
----
+## 5. TikTok — những điều đã kiểm chứng (đừng làm ngược)
+- **CDP attach Chrome/Edge thật** (`--remote-debugging-port`, profile tạm). TikTok chặn Chromium của Playwright.
+- **Danh sách Following**: mở `tiktok.com/following?lang=en` → bấm "View all" → cuộn panel đó. Modal ở trang profile bị TikTok cắt ở ~60 hàng; widget sidebar chỉ có 5 hàng không cuộn được và cùng khớp selector hàng (đây là lý do từng kẹt ở 5). Chỉ đếm hàng đang **hiển thị**. Ép viewport 1440×900 (sidebar thu thành icon khi cửa sổ hẹp → mất nút "View all"). **Không ghé trang profile** để đọc tổng: tổng lấy từ trường `total` của `/api/user/list/`; trang profile là nơi TikTok chặn đầu tiên.
+- Kết quả thật: 524/547 kênh; TikTok tự báo `hasMore=False, isTruncated=False` ở 524 (23 kênh không được trả, nhiều khả năng là follow cũ nhất, chưa rõ nguyên nhân).
+- **Bộ chặn API** (`page.Response`): bắt `userId`, `videoCount`, `relation`, `avatarThumb` từ chính XHR của TikTok → không cần mở từng profile. Số video có sẵn nên "0 video" nhanh và an toàn.
+- **Ngày đăng cuối = `createTime` MỚI NHẤT trong trang `item_list`, không phải phần tử đầu** (phần tử đầu thường là bài GHIM, cũ có chủ đích; từng khiến kênh còn sống bị báo 237/950 ngày).
+- **Quét ngày là thao tác riêng (nút "Kiểm tra ngày")**, từng đợt nhỏ, 1 luồng, nghỉ 3–5 s, cache `lastpost.dat` (chỉ tin khi số video không đổi, tối đa 30 ngày). Quét tự động ~507 profile từng làm TikTok chặn phiên ("Something went wrong" / Access Denied). Sau ~36 kênh TikTok trả `item_list` **rỗng** (HTTP 200 không nội dung): tool dừng sau 4 lần rỗng liên tiếp.
+- Đọc profile (`GetUserDetail*`): dữ liệu `__UNIVERSAL_DATA_FOR_REHYDRATION__` đôi khi chưa có lúc vừa tải → đợi vài giây, rồi dự phòng bằng phản hồi `api/user/detail` của chính trang.
+- Unfollow: bấm trong trình duyệt (HTTP trực tiếp không dùng được: thiếu chữ ký). Kênh đã xóa (Access Denied) + có `userId` → `fetch()` ngay trong ngữ cảnh trang. Có hộp xác nhận (mặc định No), bỏ qua bạn bè (`SkipFriends`, `relation == 2`) và whitelist, giới hạn phiên/ngày, tự chờ rate limit.
+- **Chưa kiểm chứng thật**: một lượt unfollow nhiều kênh qua hộp xác nhận mới; nút "Kiểm tra ngày" vượt 36 kênh với nhịp chậm.
 
-## Các quyết định thiết kế không hiển nhiên
+## 6. YouTube — những điều đã kiểm chứng
+- Một phiên Chrome dùng xuyên suốt, **profile riêng lưu lâu dài** (`youtube_profile`), không đọc cookie, không OAuth. Google cho đăng nhập và nhớ phiên. Tab 1 giữ danh sách `youtube.com/feed/channels`, tab 2 đọc ngày đăng; luôn `BringToFrontAsync` tab đang làm việc (tab nền bị Chrome làm chậm).
+- Danh sách: cuộn đến khi số `ytd-channel-renderer` ổn định; tên lấy từ `ytd-channel-name #text` (textContent của `ytd-channel-name` bị lặp tên do tooltip).
+- **Ngày đăng**: RSS (`feeds/videos.xml`) hiện trả 404 cho MỌI kênh (sự cố phía YouTube đã được báo cáo, không có thông báo ngừng) nên không dùng. Đọc từ tab Videos (`/videos?hl=en`, mặc định Latest): YouTube viết `13h ago`, `5d ago`, `9mo ago`, `3y ago` → `AgeText` quy ra ngày xấp xỉ.
+- **Shorts**: tab Videos không liệt kê Shorts và Shorts không có ngày. Kênh có tab Shorts mà video dài ≥ 30 ngày/không có → **`IsUncertain` ("Có Shorts — chưa rõ")**, không bao giờ tự chọn/không gọi là inactive.
+- **Hủy đăng ký**: Playwright từ chối bấm nút ("element is not visible") → **bấm bằng DOM `click()`** (`button.EvaluateAsync("b => b.click()")`), bấm nút xác nhận `yt-confirm-dialog-renderer #confirm-button button`, rồi **chờ phản hồi HTTP của `/subscription/unsubscribe`**; chỉ tin kết quả sau phản hồi đó (giao diện đổi nút ngay lập tức, tải lại trang quá sớm sẽ hủy request).
+- **Trusted Types**: YouTube chặn chạy chuỗi lệnh động → `WaitForFunctionAsync` lỗi `EvalError`. Chỉ dùng `EvaluateAsync` kiểu hàm, tự lặp kiểm tra bằng vòng `while`.
+- An toàn: hộp xác nhận (mặc định No), **tự sao lưu CSV trước mỗi lượt hủy**, kênh được bảo vệ không bao giờ bị hủy, giới hạn mỗi lượt + nhịp nghỉ lấy từ Cài đặt (`UnfollowSessionLimit`, `UnfollowDelayMinMs/MaxMs`), dừng sau 3 lỗi liên tiếp, lịch sử loại `Unsubscribe`.
+- Đã chạy thật: đăng nhập + nhớ phiên, đọc danh sách, đọc ngày (7/7), hủy 1 kênh và 2 kênh (HTTP 200, kênh biến mất sau khi tải lại, CSV + cache được ghi). Chưa thử với danh sách hàng trăm kênh.
 
-| Quyết định | Lý do |
-|-----------|-------|
-| Không có combo "số ngày không hoạt động" | TikTok không lộ ngày đăng cuối trên trang Following; fetch ngày cuối cho từng profile = N×M request, không thực tế |
-| Tiêu chí "kênh chết" = videoCount==0 duy nhất | Thông tin duy nhất có thể lấy được mà không bị rate limit |
-| Không dùng `user_detail_api` endpoint | TikTok trả 200 rỗng vì thiếu chữ ký chống-bot — dùng UNIVERSAL_DATA thay thế |
-| Playwright thay vì HTTP thuần để load following | TikTok dùng JS lazy-load, không có endpoint public nào trả toàn bộ following list |
-| Cookie đọc từ browser thay vì user login | Không cần implement OAuth/login flow phức tạp; user đã đăng nhập sẵn trên Chrome |
-| yt-dlp.exe bundled thay vì NuGet wrapper | Full control output parsing, không phụ thuộc wrapper có thể lag update |
+## 7. Bẫy khi làm việc với Claude / công cụ
+- **Ứng dụng Claude (MSIX) thấy bản sao CŨ của một số file trong `%APPDATA%\TikTool`** (`session_resume.dat`, `history.dat`, `tiktool_session*.log`...). Đừng kết luận "ghi không được"/"bị Kaspersky chặn": ghi chú Kaspersky cũ rất có thể là hiện tượng này. Muốn đọc file thật, nhờ người dùng chạy trong terminal của họ: `Copy-Item "$env:APPDATA\TikTool\<file>" D:\code\frm_tiktool\TikTool\bin\<tên> -Force`. File MỚI (`logs\`, `avatars\`...) đọc đúng. Log chẩn đoán đọc từ `logs\session_*.log`.
+- Hook của phiên worktree từng chặn Edit/Write vào thư mục chính; ghi file bằng PowerShell khi người dùng đã cho phép.
+- `Process.Start` với Playwright: Chrome do tool mở phải được đóng bằng CDP `Browser.close` (không kill) để profile lưu cookie đúng.
 
----
+## 8. Quy ước
+- Async đến cùng, `CancellationToken` xuyên suốt, không `.Result/.Wait()`. Cập nhật UI từ luồng nền qua `BeginInvoke`.
+- Log qua `LogPanel.Log(...)` (tự ghi cả vào file phiên qua `AppLog`). Service ném exception có nội dung đã qua `T()`; trường hợp cần phản ứng riêng thì dùng **loại exception riêng** (`CookieFileLockedException`), không tìm chữ trong thông báo.
+- Page bắt lỗi và log, không popup trừ khi cần quyết định của người dùng (hộp xác nhận hủy, tiếp tục phiên cũ, tự đóng trình duyệt giữ khóa cookie).
+- Commit không có dòng `Co-Authored-By`; PR không có chữ ký công cụ (yêu cầu của chủ dự án).
+- Không sửa bừa: `PlaywrightService.cs`, `CookieService.cs` (DPAPI), thứ tự trong `MainForm`, `selectors.json` (tăng `Version` khi sửa).
 
-## Files đừng sửa lung tung
-
-- **`PlaywrightService.cs`** — logic phức tạp, nhiều edge case; đọc kỹ comment trước khi sửa
-- **`CookieService.cs`** — crypto DPAPI nhạy cảm; sửa sai = mất cookie đã lưu
-- **`MainForm.cs` constructor** — thứ tự inject service phải giữ nguyên
-- **`selectors.json`** — tăng `Version` khi sửa để `UpdateService` phân phối đúng
-
----
-
-*File này được tạo tự động từ PROGRESS.md + codebase thực tế. Cập nhật PROGRESS.md sau mỗi phiên làm việc.*
+## 9. Việc còn lại (theo ưu tiên)
+1. Người dùng thử thật: unfollow nhiều kênh TikTok qua hộp xác nhận; "Kiểm tra ngày" vượt 36 kênh; YouTube (bảo vệ kênh, tìm kiếm, xuất CSV, lịch sử).
+2. 23 kênh TikTok không được API trả (thử xin trang kế tiếp bằng `fetch` trong ngữ cảnh trang — chưa chắc).
+3. App icon `.ico`; đóng gói để người khác dùng (file chạy độc lập + hướng dẫn cài).
+4. Gộp mã dùng chung giữa hai trang (dòng kênh, bộ lọc) nếu thêm nền tảng thứ ba.
+5. `LOGIC_REVIEW.md` là bản rà soát cũ, nhiều mục đã xử lý; đối chiếu trước khi tin.

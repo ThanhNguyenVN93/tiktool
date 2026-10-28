@@ -373,8 +373,8 @@ internal sealed class UnfollowPage : UserControl
         {
             Text = T("💤  Chọn không hoạt động", "💤  Select inactive"),
             Font = Theme.FontMedium,
-            Size = new Size(160, 28),
-            Location = new Point(ContentWidth - 268, 0),
+            Size = new Size(205, 28),
+            Location = new Point(ContentWidth - 100 - 8 - 205, 0),
             FillColor = ColorTranslator.FromHtml("#1a1a1a"),
             ForeColor = Theme.TextSecondary,
             BorderRadius = 7,
@@ -386,8 +386,8 @@ internal sealed class UnfollowPage : UserControl
         {
             Text = T("☑  Chọn tất cả đang hiện", "☑  Select all shown"),
             Font = Theme.FontMedium,
-            Size = new Size(170, 28),
-            Location = new Point(ContentWidth - 268 - 8 - 170, 0),
+            Size = new Size(215, 28),
+            Location = new Point(ContentWidth - 100 - 8 - 205 - 8 - 215, 0),
             FillColor = ColorTranslator.FromHtml("#1a1a1a"),
             ForeColor = Theme.TextSecondary,
             BorderRadius = 7,

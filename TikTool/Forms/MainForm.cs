@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Guna.UI2.WinForms;
 using TikTool.Pages;
 using TikTool.Services;
@@ -38,9 +38,13 @@ public sealed class MainForm : Form
     public MainForm()
     {
         Text = "Social Toolkit";
+        Icon = LoadAppIcon();
         StartPosition = FormStartPosition.CenterScreen;
         Size = new Size(1080, 700);
         MinimumSize = new Size(900, 600);
+        // The pages use a fixed content width, so a bigger window only adds empty space: keep one size.
+        FormBorderStyle = FormBorderStyle.FixedSingle;
+        MaximizeBox = false;
         BackColor = Theme.Background;
         Font = Theme.FontRegular;
 
@@ -112,15 +116,48 @@ public sealed class MainForm : Form
         var menu = new ContextMenuStrip();
         menu.Items.Add(T("Mở Social Toolkit", "Open Social Toolkit"), null, (_, _) => RestoreFromTray());
         menu.Items.Add(new ToolStripSeparator());
+        menu.Items.Add(T("Tải video", "Download"), null, (_, _) => OpenFromTray("download"));
+        menu.Items.Add(T("TikTok Unfollow", "TikTok Unfollow"), null, (_, _) => OpenFromTray(TikTokUnfollowKey));
+        menu.Items.Add(T("YouTube Unsubscribe", "YouTube Unsubscribe"), null, (_, _) => OpenFromTray(YouTubeUnsubKey));
+        menu.Items.Add(T("Lịch sử", "History"), null, (_, _) => OpenFromTray("history"));
+        menu.Items.Add(T("Cài đặt", "Settings"), null, (_, _) => OpenFromTray("settings"));
+        menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(T("Thoát", "Exit"), null, (_, _) => { _trayIcon!.Visible = false; Application.Exit(); });
 
         _trayIcon = new NotifyIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = LoadAppIcon(),
             Text = "Social Toolkit",
             ContextMenuStrip = menu,
         };
         _trayIcon.DoubleClick += (_, _) => RestoreFromTray();
+    }
+
+    private static Icon LoadAppIcon()
+    {
+        try
+        {
+            return Icon.ExtractAssociatedIcon(Application.ExecutablePath) ?? SystemIcons.Application;
+        }
+        catch (Exception)
+        {
+            return SystemIcons.Application;
+        }
+    }
+
+    /// <summary>Called when the user starts a second copy of the app: show this window instead of opening another one.</summary>
+    public void BringToFrontFromAnotherInstance()
+    {
+        RestoreFromTray();
+        TopMost = true;
+        TopMost = false;
+        Activate();
+    }
+
+    private void OpenFromTray(string pageKey)
+    {
+        RestoreFromTray();
+        NavigateTo(pageKey);
     }
 
     private void RestoreFromTray()
@@ -272,7 +309,7 @@ public sealed class MainForm : Form
         };
         var sub = new Label
         {
-            Text = "Download & clean up",
+            Text = "Download && clean up",
             Font = new Font("Segoe UI", 7.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = true,
