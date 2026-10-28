@@ -60,6 +60,7 @@ internal sealed class UnfollowPage : UserControl
     {
         _playwright = playwright;
         _playwright.BrowserStateChanged += UpdateButtonStates;
+        _playwright.ChallengeNotice += text => _log.Log(text, LogLevel.Warn);
         _apiService = apiService;
         _cookieService = cookieService;
         _settingsService = settingsService;
@@ -652,6 +653,7 @@ internal sealed class UnfollowPage : UserControl
     {
         await _playwright.DisposeAsync();
         await EnsureChromeAsync();
+        _playwright.ChallengeCooldownSeconds = _settingsService.Current.RateLimitWaitSeconds;
         await _playwright.LaunchAsync(cookie, BrowserHosts.UseEmbedded(_settingsService.Current), _settingsService.Current.RunBrowserHidden);
     }
 
@@ -660,6 +662,7 @@ internal sealed class UnfollowPage : UserControl
         if (_playwright.IsLaunched) return;
         await _playwright.DisposeAsync();
         await EnsureChromeAsync();
+        _playwright.ChallengeCooldownSeconds = _settingsService.Current.RateLimitWaitSeconds;
         await _playwright.LaunchAsync(cookie, BrowserHosts.UseEmbedded(_settingsService.Current), _settingsService.Current.RunBrowserHidden);
     }
 

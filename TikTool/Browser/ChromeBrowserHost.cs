@@ -23,6 +23,10 @@ internal sealed class ChromeBrowserHost : IBrowserHost
 
     public Task SetVisibleAsync(bool visible, CancellationToken ct) => Task.CompletedTask;
 
+    public Task ShowForChallengeAsync(IPage page) => page.BringToFrontAsync();
+
+    public Task RestoreAfterChallengeAsync(IPage page, bool hideWindow) => Task.CompletedTask;
+
     public async Task<IBrowserContext> StartAsync(IPlaywright playwright, string profileDir, string windowTitle, CancellationToken ct)
     {
         var chromePath = PlaywrightService.FindRealChromeExecutable()

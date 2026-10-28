@@ -28,6 +28,12 @@ internal interface IBrowserHost : IAsyncDisposable
     /// timers, clicks and navigation behave the same as when it is visible).</summary>
     Task SetVisibleAsync(bool visible, CancellationToken ct);
 
+    /// <summary>Brings the given page in front of the user: the window is shown on top, and when the page is the hidden reading page it is brought up inside the window.</summary>
+    Task ShowForChallengeAsync(IPage page);
+
+    /// <summary>Undoes <see cref="ShowForChallengeAsync"/>: the reading page goes back to hiding, and the window is hidden again when <paramref name="hideWindow"/> is set.</summary>
+    Task RestoreAfterChallengeAsync(IPage page, bool hideWindow);
+
     /// <summary>Starts the browser with a persistent profile folder and returns the Playwright context attached to it.</summary>
     Task<IBrowserContext> StartAsync(IPlaywright playwright, string profileDir, string windowTitle, CancellationToken ct);
 

@@ -20,6 +20,52 @@ internal sealed class WebViewBrowserHost : IBrowserHost
 
     public bool StartHidden { get; set; }
 
+    public async Task ShowForChallengeAsync(IPage page)
+    {
+        var window = _window;
+        if (window is null)
+        {
+            return;
+        }
+
+        var isWorker = ReferenceEquals(page, _worker);
+        await UiThread.InvokeAsync(() =>
+        {
+            window.SetVisible(true);
+            if (isWorker)
+            {
+                window.ShowWorker(true);
+            }
+
+            return Task.CompletedTask;
+        });
+    }
+
+    public async Task RestoreAfterChallengeAsync(IPage page, bool hideWindow)
+    {
+        var window = _window;
+        if (window is null)
+        {
+            return;
+        }
+
+        var isWorker = ReferenceEquals(page, _worker);
+        await UiThread.InvokeAsync(() =>
+        {
+            if (isWorker)
+            {
+                window.ShowWorker(false);
+            }
+
+            if (hideWindow)
+            {
+                window.SetVisible(false);
+            }
+
+            return Task.CompletedTask;
+        });
+    }
+
     public async Task SetVisibleAsync(bool visible, CancellationToken ct)
     {
         var window = _window;

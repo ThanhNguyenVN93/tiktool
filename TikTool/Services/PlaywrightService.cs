@@ -30,6 +30,7 @@ public sealed class PlaywrightService : IAsyncDisposable
     private IBrowserHost? _host;
     private IPage? _workerPage;
     private readonly SemaphoreSlim _workerGate = new(1, 1);
+    private ChallengeGate? _gate;
     private string? _profileDir;
 
     /// <summary>True while the browser is up. A closed window counts as not launched, so the next run starts a fresh one.</summary>
@@ -37,6 +38,12 @@ public sealed class PlaywrightService : IAsyncDisposable
 
     /// <summary>Raised when the browser starts, stops, or its window is shown or hidden (may come from any thread).</summary>
     public event Action? BrowserStateChanged;
+
+    /// <summary>Seconds to wait after a captcha is solved before the work goes on (the pages set it from the rate-limit wait).</summary>
+    public int ChallengeCooldownSeconds { get; set; } = 90;
+
+    /// <summary>User-facing lines about a captcha (waiting, reminders, solved).</summary>
+    public event Action<string>? ChallengeNotice;
 
     /// <summary>The work window can be hidden (built-in browser only).</summary>
     public bool BrowserCanHide => _host is { CanHide: true };
@@ -84,6 +91,11 @@ public sealed class PlaywrightService : IAsyncDisposable
         _context = await _host.StartAsync(_playwright, profile, T("Social Toolkit — Trình duyệt TikTok", "Social Toolkit — TikTok browser"), CancellationToken.None);
         await _context.AddCookiesAsync(BuildCookies(cookie));
         _page = await _host.GetMainPageAsync(CancellationToken.None);
+        _gate = new ChallengeGate("TikTok", _host, () => new[] { _page, _workerPage }.Where(p => p is not null).Select(p => p!).ToList())
+        {
+            CooldownSeconds = () => ChallengeCooldownSeconds,
+        };
+        _gate.Notice += text => ChallengeNotice?.Invoke(text);
         BrowserStateChanged?.Invoke();
 
         // Warm-up: this profile dir is brand new every launch (only cookies were injected, no
@@ -481,6 +493,13 @@ public sealed class PlaywrightService : IAsyncDisposable
         while (noChangeCount < 35 && stopwatch.Elapsed < overallBudget)
         {
             ct.ThrowIfCancellationRequested();
+
+            // A captcha stops the loading until it is solved; the waiting must not eat the time budget.
+            if (_gate is not null && await _gate.CheckpointAsync(T("tải danh sách đang theo dõi", "loading the following list"), ct))
+            {
+                noChangeCount = 0;
+                stopwatch.Restart();
+            }
 
             var scan = await ScanFollowingModalAsync(page, username, selectors.FollowingItem);
             var count = scan.Rows.Count;
@@ -979,8 +998,16 @@ public sealed class PlaywrightService : IAsyncDisposable
     /// this now reads the button's aria-label BEFORE and AFTER clicking (TikTok renders it as
     /// "Following {name}" vs "Follow {name}") and only reports success if it actually flipped;
     /// on failure it saves a debug dump instead of silently lying about the result.</summary>
-    public async Task<bool> ClickUnfollowAsync(
+    public Task<bool> ClickUnfollowAsync(
         string username, SelectorsConfig selectors, string userId = "", CancellationToken ct = default)
+    {
+        // Safe to run again after a captcha: it reads the button state first and reports "done" when the account is no longer followed.
+        Task<bool> Step() => ClickUnfollowCoreAsync(username, selectors, userId, ct);
+        return _gate is null ? Step() : _gate.RunStepAsync(Step, T($"bỏ theo dõi @{username}", $"unfollowing @{username}"), ct);
+    }
+
+    private async Task<bool> ClickUnfollowCoreAsync(
+        string username, SelectorsConfig selectors, string userId, CancellationToken ct)
     {
         EnsureLaunched();
         var page = _page!;
@@ -1442,8 +1469,15 @@ public sealed class PlaywrightService : IAsyncDisposable
     /// <paramref name="username"/> via <see cref="GetUserDetailOnPageAsync"/>, then closes the
     /// page. Safe to call concurrently from multiple tasks as long as the browser context is
     /// still open. Returns null on any failure so callers never need to catch.</summary>
-    public async Task<(string UserId, int VideoCount, long? LastPostUnixSeconds, int Relation)?> GetUserDetailParallelAsync(
+    public Task<(string UserId, int VideoCount, long? LastPostUnixSeconds, int Relation)?> GetUserDetailParallelAsync(
         string username, CancellationToken ct = default)
+    {
+        Task<(string UserId, int VideoCount, long? LastPostUnixSeconds, int Relation)?> Step() => GetUserDetailParallelCoreAsync(username, ct);
+        return _gate is null ? Step() : _gate.RunStepAsync(Step, T($"đọc hồ sơ @{username}", $"reading the profile of @{username}"), ct);
+    }
+
+    private async Task<(string UserId, int VideoCount, long? LastPostUnixSeconds, int Relation)?> GetUserDetailParallelCoreAsync(
+        string username, CancellationToken ct)
     {
         EnsureLaunched();
         if (_host is { WorkerRunsOneAtATime: true })
@@ -1524,6 +1558,7 @@ public sealed class PlaywrightService : IAsyncDisposable
         _context = null;
         _page = null;
         _workerPage = null;
+        _gate = null;
         _playwright = null;
         _host = null;
         _profileDir = null;

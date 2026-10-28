@@ -112,6 +112,28 @@ internal sealed class BrowserWindow : Form
         IsShown = visible;
     }
 
+    /// <summary>Brings the reading control up to fill the window (so a challenge shown on it can be solved), or puts it back to hiding.</summary>
+    public void ShowWorker(bool show)
+    {
+        if (_worker is null)
+        {
+            return;
+        }
+
+        if (show)
+        {
+            _worker.Dock = DockStyle.Fill;
+            _worker.Visible = true;
+            _worker.BringToFront();
+        }
+        else
+        {
+            _worker.Visible = false;
+            _worker.Dock = DockStyle.Right;
+            _worker.Width = 360;
+        }
+    }
+
     /// <summary>Creates the second control (once), points it at a marker URL so the caller can find its Playwright page, then hides it.</summary>
     public async Task EnsureWorkerAsync(string marker)
     {

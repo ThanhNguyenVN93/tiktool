@@ -614,7 +614,11 @@ internal sealed class YouTubePage : UserControl
             _service = null;
         }
 
-        _service ??= new YouTubeService(BrowserHosts.UseEmbedded(_settings.Current), _settings.Current.RunBrowserHidden);
+        _service ??= new YouTubeService(BrowserHosts.UseEmbedded(_settings.Current), _settings.Current.RunBrowserHidden)
+        {
+            ChallengeCooldownSeconds = _settings.Current.RateLimitWaitSeconds,
+        };
+        _service.ChallengeNotice += text => _log.Log(text, LogLevel.Warn);
         _service.BrowserStateChanged += () =>
         {
             if (InvokeRequired) BeginInvoke(UpdateButtonStates); else UpdateButtonStates();

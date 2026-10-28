@@ -148,6 +148,31 @@ public sealed class MainForm : Form
         }
     }
 
+    /// <summary>Something needs the user (a captcha): a sound, the taskbar button flashes until the app is in front, and a balloon when the app sits in the tray.</summary>
+    public void ShowAlert(string title, string text)
+    {
+        System.Media.SystemSounds.Exclamation.Play();
+        var info = new FlashInfo { Size = (uint)System.Runtime.InteropServices.Marshal.SizeOf<FlashInfo>(), Window = Handle, Flags = 0x3 | 0xC, Count = uint.MaxValue, Timeout = 0 };
+        FlashWindowEx(ref info);
+        if (_trayIcon is { Visible: true })
+        {
+            _trayIcon.ShowBalloonTip(8000, title, text, ToolTipIcon.Warning);
+        }
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct FlashInfo
+    {
+        public uint Size;
+        public IntPtr Window;
+        public uint Flags;
+        public uint Count;
+        public uint Timeout;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool FlashWindowEx(ref FlashInfo info);
+
     /// <summary>Called when the user starts a second copy of the app: show this window instead of opening another one.</summary>
     public void BringToFrontFromAnotherInstance()
     {

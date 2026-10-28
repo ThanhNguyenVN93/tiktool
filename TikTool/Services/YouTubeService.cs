@@ -22,6 +22,7 @@ internal sealed class YouTubeService : IAsyncDisposable
     private IBrowserHost? _host;
     private readonly bool _embedded;
     private readonly bool _startHidden;
+    private ChallengeGate? _gate;
     private IPlaywright? _playwright;
     private IBrowserContext? _context;
     private IPage? _feedPage;
@@ -33,6 +34,12 @@ internal sealed class YouTubeService : IAsyncDisposable
         _embedded = useEmbeddedBrowser;
         _startHidden = startHidden;
     }
+
+    /// <summary>Seconds to wait after a captcha is solved before the work goes on (the page sets it from the rate-limit wait).</summary>
+    public int ChallengeCooldownSeconds { get; set; } = 90;
+
+    /// <summary>User-facing lines about a verification (waiting, reminders, solved).</summary>
+    public event Action<string>? ChallengeNotice;
 
     /// <summary>Raised when the browser window is shown or hidden.</summary>
     public event Action? BrowserStateChanged;
@@ -73,6 +80,11 @@ internal sealed class YouTubeService : IAsyncDisposable
                 T("Social Toolkit — Trình duyệt YouTube", "Social Toolkit — YouTube browser"),
                 ct);
             var page = await _host.GetMainPageAsync(ct);
+            _gate = new ChallengeGate("YouTube", _host, () => new[] { page, _agePage }.Where(p => p is not null).Select(p => p!).ToList())
+            {
+                CooldownSeconds = () => ChallengeCooldownSeconds,
+            };
+            _gate.Notice += text => ChallengeNotice?.Invoke(text);
 
             await EnsureSignedInAsync(page, log, ct);
 
@@ -253,7 +265,13 @@ internal sealed class YouTubeService : IAsyncDisposable
 
     /// <summary>Reads how long ago the newest video was posted from the channel's Videos tab (default sort: Latest) in a
     /// second tab. Approximate by design: YouTube shows "13h ago", "5d ago", "9mo ago", "3y ago".</summary>
-    public async Task<AgeResult> ReadLatestUploadAsync(string channelUrl, CancellationToken ct)
+    public Task<AgeResult> ReadLatestUploadAsync(string channelUrl, CancellationToken ct)
+    {
+        Task<AgeResult> Step() => ReadLatestUploadCoreAsync(channelUrl, ct);
+        return _gate is null ? Step() : _gate.RunStepAsync(Step, T("đọc ngày đăng video", "reading the latest upload"), ct);
+    }
+
+    private async Task<AgeResult> ReadLatestUploadCoreAsync(string channelUrl, CancellationToken ct)
     {
         if (_context is null || _host is null)
         {
@@ -313,7 +331,14 @@ internal sealed class YouTubeService : IAsyncDisposable
     /// <summary>Unsubscribes one channel on the list tab: finds its row by link, DOM-clicks the (hidden) subscribed button,
     /// confirms YouTube's dialog and waits for the server's HTTP answer, which is the only real proof it worked (the
     /// button flips instantly in the UI, and navigating away too early cancels the request).</summary>
-    public async Task<(bool Ok, string? Error)> UnsubscribeAsync(YouTubeChannel channel, CancellationToken ct)
+    public Task<(bool Ok, string? Error)> UnsubscribeAsync(YouTubeChannel channel, CancellationToken ct)
+    {
+        // A finished unsubscribe is kept even if a verification shows up right after it (it must not be repeated).
+        Task<(bool Ok, string? Error)> Step() => UnsubscribeCoreAsync(channel, ct);
+        return _gate is null ? Step() : _gate.RunStepAsync(Step, T("hủy đăng ký kênh", "unsubscribing"), ct, redoWhenChallengedAfterSuccess: false);
+    }
+
+    private async Task<(bool Ok, string? Error)> UnsubscribeCoreAsync(YouTubeChannel channel, CancellationToken ct)
     {
         var page = _feedPage ?? throw new InvalidOperationException("Not connected.");
         await page.BringToFrontAsync();
@@ -472,4 +497,5 @@ internal sealed class YouTubeService : IAsyncDisposable
         _context = null;
         _feedPage = null;
         _agePage = null;
+        _gate = null;
     }}
