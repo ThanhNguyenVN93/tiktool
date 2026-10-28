@@ -312,7 +312,10 @@ public sealed class MainForm : Form
                 return;
             }
 
-            var result = UpdateController.ApplyAndRestart();
+            _updateText.Text = T("Đang cài bản cập nhật, vui lòng đợi (app sẽ tự khởi động lại)...", "Installing the update, please wait (the app restarts by itself)...");
+            _btnUpdateNow.Visible = _btnUpdateInfo.Visible = _btnUpdateLater.Visible = false;
+            LayoutUpdateBar();
+            var result = await Task.Run(UpdateController.ApplyAndRestart);
             if (result.Ok)
             {
                 Application.Exit();

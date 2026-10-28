@@ -34,8 +34,20 @@ internal static class Program
         var settings = new SettingsService();
         LanguageService.Initialize(settings.Current.Language);
 
-        // "Install updates automatically": an update downloaded earlier is installed now, before any window opens.
-        if (UpdateController.TryApplyStagedAtStartup(settings.Current))
+        // "Install updates automatically": an update downloaded earlier is installed now, before the app window opens. Swapping hundreds of
+        // files can take a while (security software scans each one), so show the splash with a message instead of nothing.
+        SplashForm? updateSplash = null;
+        if (settings.Current.AutoInstallUpdates && AppUpdater.FindStaged() is not null)
+        {
+            updateSplash = new SplashForm();
+            updateSplash.Show();
+            updateSplash.Status = T("Đang cài bản cập nhật, vui lòng đợi...", "Installing the update, please wait...");
+            Application.DoEvents();
+        }
+
+        var restarted = UpdateController.TryApplyStagedAtStartup(settings.Current);
+        updateSplash?.Close();
+        if (restarted)
         {
             return;
         }
