@@ -35,6 +35,8 @@ internal sealed class SettingsPage : UserControl
     private Guna2ToggleSwitch _minimizeToTrayToggle = null!;
     private Guna2ToggleSwitch _embeddedBrowserToggle = null!;
     private Guna2ToggleSwitch _runHiddenToggle = null!;
+    private Guna2ToggleSwitch _checkUpdatesToggle = null!;
+    private Guna2ToggleSwitch _autoInstallToggle = null!;
 
     private Label _savedInfo = null!;
 
@@ -112,6 +114,7 @@ internal sealed class SettingsPage : UserControl
         flow.Controls.Add(BuildGroup(T("TẢI VIDEO", "DOWNLOAD"), BuildDownloadRows()));
         flow.Controls.Add(BuildGroup(T("BỎ THEO DÕI", "UNFOLLOW"), BuildUnfollowRows()));
         flow.Controls.Add(BuildGroup(T("TRÌNH DUYỆT", "BROWSER"), BuildBrowserRows()));
+        flow.Controls.Add(BuildGroup(T("CẬP NHẬT", "UPDATES"), BuildUpdateRows()));
         flow.Controls.Add(BuildGroup(T("NHẬT KÝ", "LOGS"), BuildLogRows()));
         flow.Controls.Add(BuildGroup(T("GIAO DIỆN && HỆ THỐNG", "INTERFACE && SYSTEM"), BuildAppRows()));
         flow.Controls.Add(BuildGroup(T("NGÔN NGỮ", "LANGUAGE"), BuildLanguageRows()));
@@ -273,6 +276,57 @@ internal sealed class SettingsPage : UserControl
                   "The working browser window stays hidden (it works the same). A small button on the bottom bar of the Unfollow / YouTube pages shows it again. Applies the next time you run."), _runHiddenToggle),
         };
     }
+    private List<Control> BuildUpdateRows()
+    {
+        _checkUpdatesToggle = BuildToggle();
+        _autoInstallToggle = BuildToggle();
+        var check = new Guna2Button
+        {
+            Text = T("Kiểm tra ngay", "Check now"),
+            Font = Theme.FontMedium,
+            Size = new Size(130, 28),
+            FillColor = ColorTranslator.FromHtml("#2a2a2a"),
+            ForeColor = Theme.TextSecondary,
+            BorderRadius = 7,
+            Cursor = Cursors.Hand,
+        };
+        check.Click += async (_, _) => await CheckForUpdateNowAsync(check);
+
+        return new List<Control>
+        {
+            BuildRow("🔔", T("Kiểm tra bản mới khi mở app", "Check for updates when the app starts"),
+                T("Hỏi GitHub xem có bản phát hành mới không. Chỉ một yêu cầu, không gửi dữ liệu của bạn.",
+                  "Asks GitHub whether a newer release exists. One request; none of your data is sent."), _checkUpdatesToggle),
+            BuildRow("⬇️", T("Tự động cài bản mới", "Install updates automatically"),
+                T("Tải bản mới ở nền, kiểm tra SHA256, rồi cài vào lần mở app kế tiếp. Tắt thì app chỉ báo và bạn bấm Cập nhật.",
+                  "Downloads a new version in the background, checks its SHA256 and installs it the next time the app starts. Off: the app only tells you and you press Update."), _autoInstallToggle),
+            BuildRow("ℹ️", T($"Phiên bản hiện tại: v{AppVersion.Text}", $"Current version: v{AppVersion.Text}"),
+                T("Xem ngay có bản mới không.", "Look for a newer version now."), check),
+        };
+    }
+
+    private async Task CheckForUpdateNowAsync(Guna2Button button)
+    {
+        button.Enabled = false;
+        try
+        {
+            var status = await UpdateController.CheckAsync(autoDownload: false);
+            var message = status switch
+            {
+                UpdateStatus.Available or UpdateStatus.Ready =>
+                    T($"Có bản mới {UpdateController.Info?.Tag}. Dải thông báo ở đầu cửa sổ có nút Cập nhật.",
+                      $"A new version {UpdateController.Info?.Tag} is available. The bar at the top of the window has the Update button."),
+                _ when UpdateController.LastCheckError is { } err => T($"Không kiểm tra được: {err}", $"Could not check: {err}"),
+                _ => T($"Bạn đang dùng bản mới nhất (v{AppVersion.Text}).", $"You are on the latest version (v{AppVersion.Text})."),
+            };
+            MessageBox.Show(this, message, "Social Toolkit", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        finally
+        {
+            button.Enabled = true;
+        }
+    }
+
     private List<Control> BuildLogRows()
     {
         var open = new Guna2Button
@@ -438,6 +492,8 @@ internal sealed class SettingsPage : UserControl
         _minimizeToTrayToggle.Checked = s.MinimizeToTray;
         _embeddedBrowserToggle.Checked = s.UseEmbeddedBrowser;
         _runHiddenToggle.Checked = s.RunBrowserHidden;
+        _checkUpdatesToggle.Checked = s.CheckForUpdates;
+        _autoInstallToggle.Checked = s.AutoInstallUpdates;
 
         _languageCombo.SelectedIndex = s.Language == "en" ? 1 : 0;
     }
@@ -472,6 +528,8 @@ internal sealed class SettingsPage : UserControl
         s.MinimizeToTray = _minimizeToTrayToggle.Checked;
         s.UseEmbeddedBrowser = _embeddedBrowserToggle.Checked;
         s.RunBrowserHidden = _runHiddenToggle.Checked;
+        s.CheckForUpdates = _checkUpdatesToggle.Checked;
+        s.AutoInstallUpdates = _autoInstallToggle.Checked;
 
         var newLang = _languageCombo.SelectedIndex == 1 ? "en" : "vi";
         var langChanged = newLang != s.Language;

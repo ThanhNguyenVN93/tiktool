@@ -35,6 +35,14 @@ public sealed class MainForm : Form
     private Label _lblCookie = null!;
     private Guna2Panel _dotCookie = null!;
 
+    // app updates (see UpdateController): a bar above the pages, shown only when there is something to say
+    private Panel _updateBar = null!;
+    private Label _updateText = null!;
+    private Guna2Button _btnUpdateNow = null!;
+    private Guna2Button _btnUpdateInfo = null!;
+    private Guna2Button _btnUpdateLater = null!;
+    private bool _updateDismissed;
+
     public MainForm()
     {
         Text = "Social Toolkit";
@@ -74,6 +82,7 @@ public sealed class MainForm : Form
         };
 
         Controls.Add(_contentPanel);
+        Controls.Add(BuildUpdateBar());
         Controls.Add(sidebar);
 
         RegisterPage("download", new DownloadPage(ytDlpService, historyService, settingsService, cookieService));
@@ -96,6 +105,11 @@ public sealed class MainForm : Form
         {
             InitTrayIcon();
             _ = RefreshFooterAsync();
+
+            if (settingsService.Current.CheckForUpdates)
+            {
+                _ = Task.Run(() => UpdateController.CheckAsync(settingsService.Current.AutoInstallUpdates));
+            }
 
             if (settingsService.Current.AutoUpdateYtDlp)
             {
@@ -145,6 +159,173 @@ public sealed class MainForm : Form
         catch (Exception)
         {
             return SystemIcons.Application;
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------ app updates
+
+    private Panel BuildUpdateBar()
+    {
+        _updateBar = new Panel { Dock = DockStyle.Top, Height = 44, Visible = false, BackColor = ColorTranslator.FromHtml("#1b2338") };
+        _updateText = new Label
+        {
+            AutoSize = false,
+            AutoEllipsis = true,
+            Location = new Point(16, 0),
+            Height = 44,
+            TextAlign = ContentAlignment.MiddleLeft,
+            ForeColor = Color.White,
+            Font = Theme.FontMedium,
+            BackColor = Color.Transparent,
+        };
+        _btnUpdateNow = MakeUpdateButton(Theme.Accent, Color.White, 150);
+        _btnUpdateInfo = MakeUpdateButton(ColorTranslator.FromHtml("#2a2a2a"), Theme.TextSecondary, 110);
+        _btnUpdateInfo.Text = T("Có gì mới", "What's new");
+        _btnUpdateLater = MakeUpdateButton(ColorTranslator.FromHtml("#2a2a2a"), Theme.TextSecondary, 90);
+        _btnUpdateLater.Text = T("Để sau", "Later");
+
+        _btnUpdateNow.Click += async (_, _) => await OnUpdateNowAsync();
+        _btnUpdateInfo.Click += (_, _) =>
+        {
+            if (UpdateController.Info is { } info)
+            {
+                OpenUrl(info.PageUrl);
+            }
+        };
+        _btnUpdateLater.Click += (_, _) =>
+        {
+            _updateDismissed = true;
+            RefreshUpdateBar();
+        };
+
+        _updateBar.Controls.AddRange(new Control[] { _updateText, _btnUpdateNow, _btnUpdateInfo, _btnUpdateLater });
+        _updateBar.Resize += (_, _) => LayoutUpdateBar();
+        UpdateController.Changed += () =>
+        {
+            if (IsHandleCreated && !IsDisposed)
+            {
+                BeginInvoke(RefreshUpdateBar);
+            }
+        };
+        return _updateBar;
+    }
+
+    private static Guna2Button MakeUpdateButton(Color fill, Color fore, int width) => new()
+    {
+        Size = new Size(width, 28),
+        Font = Theme.FontMedium,
+        FillColor = fill,
+        ForeColor = fore,
+        BorderRadius = 7,
+        Cursor = Cursors.Hand,
+        Visible = false,
+    };
+
+    private void LayoutUpdateBar()
+    {
+        var right = _updateBar.Width - 16;
+        foreach (var button in new[] { _btnUpdateLater, _btnUpdateInfo, _btnUpdateNow })
+        {
+            if (!button.Visible)
+            {
+                continue;
+            }
+
+            right -= button.Width;
+            button.Location = new Point(right, 8);
+            right -= 8;
+        }
+
+        _updateText.Width = Math.Max(100, right - 16);
+    }
+
+    private void RefreshUpdateBar()
+    {
+        var status = UpdateController.Status;
+        var info = UpdateController.Info;
+        if (status == UpdateStatus.Checking)
+        {
+            _updateDismissed = false; // a new check (for example "Check now") brings the bar back
+        }
+
+        var show = !_updateDismissed && info is not null && status is UpdateStatus.Available or UpdateStatus.Downloading or UpdateStatus.Ready or UpdateStatus.Failed;
+        _updateBar.Visible = show;
+        if (!show || info is null)
+        {
+            return;
+        }
+
+        var auto = _settingsServiceRef.Current.AutoInstallUpdates;
+        switch (status)
+        {
+            case UpdateStatus.Available:
+                _updateText.Text = T($"Có bản mới {info.Tag} (bạn đang dùng v{AppVersion.Text}).", $"A new version {info.Tag} is available (you have v{AppVersion.Text}).");
+                _btnUpdateNow.Text = T("Cập nhật ngay", "Update now");
+                break;
+            case UpdateStatus.Downloading:
+                _updateText.Text = T($"Đang tải {info.Tag}… {UpdateController.Progress:P0}", $"Downloading {info.Tag}… {UpdateController.Progress:P0}");
+                break;
+            case UpdateStatus.Ready:
+                _updateText.Text = auto
+                    ? T($"{info.Tag} đã tải xong và được kiểm tra. Sẽ tự cài vào lần mở app kế tiếp, hoặc cài ngay.", $"{info.Tag} is downloaded and verified. It installs the next time you open the app, or install it now.")
+                    : T($"{info.Tag} đã tải xong và được kiểm tra.", $"{info.Tag} is downloaded and verified.");
+                _btnUpdateNow.Text = T("Khởi động lại && cập nhật", "Restart && update");
+                break;
+            default:
+                _updateText.Text = T($"Không cập nhật được {info.Tag}: {UpdateController.Error}", $"Could not update to {info.Tag}: {UpdateController.Error}");
+                _btnUpdateNow.Text = T("Thử lại", "Retry");
+                break;
+        }
+
+        var working = status == UpdateStatus.Downloading;
+        _btnUpdateNow.Visible = !working;
+        _btnUpdateInfo.Visible = !working;
+        _btnUpdateLater.Visible = !working;
+        LayoutUpdateBar();
+    }
+
+    private async Task OnUpdateNowAsync()
+    {
+        try
+        {
+            if (UpdateController.Status != UpdateStatus.Ready)
+            {
+                await UpdateController.DownloadAsync();
+            }
+
+            if (UpdateController.Status != UpdateStatus.Ready || UpdateController.Info is not { } info)
+            {
+                return;
+            }
+
+            var running = _playwrightServiceRef.IsLaunched
+                ? T("\n\nMột công việc đang chạy sẽ dừng (tiến độ đã được lưu).", "\n\nA running job will stop (its progress is saved).")
+                : "";
+            var ask = MessageBox.Show(
+                this,
+                T($"Cập nhật lên {info.Tag} bây giờ? App sẽ tự khởi động lại.{running}", $"Update to {info.Tag} now? The app restarts by itself.{running}"),
+                T("Social Toolkit — Cập nhật", "Social Toolkit — Update"),
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+            if (ask != DialogResult.Yes)
+            {
+                return;
+            }
+
+            var result = UpdateController.ApplyAndRestart();
+            if (result.Ok)
+            {
+                Application.Exit();
+            }
+            else
+            {
+                MessageBox.Show(this, T("Không cài được, đã hoàn tác (app vẫn như cũ): ", "Could not install, everything was rolled back (the app is unchanged): ") + result.Error,
+                    "Social Toolkit", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+        catch (Exception ex)
+        {
+            AppLog.Write("ERROR", "Update: " + ex, LogCategory.Update);
         }
     }
 

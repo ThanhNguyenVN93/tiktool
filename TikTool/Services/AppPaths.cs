@@ -83,6 +83,17 @@ internal static class AppPaths
         }
     }
 
+    /// <summary>Where a downloaded update waits (staged) before it is installed.</summary>
+    public static string UpdateDir
+    {
+        get
+        {
+            var dir = Path.Combine(AppDataDir, "update");
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+    }
+
     public static string SessionFile => Path.Combine(AppDataDir, "session_resume.dat");
     public static string WhitelistFile => Path.Combine(AppDataDir, "whitelist.dat");
 
