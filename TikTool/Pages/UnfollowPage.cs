@@ -356,7 +356,9 @@ internal sealed class UnfollowPage : UserControl
             Text = T("Chưa tải danh sách theo dõi", "Following list not loaded"),
             Font = Theme.FontLabel,
             ForeColor = ColorTranslator.FromHtml("#444444"),
-            AutoSize = true,
+            AutoSize = false,
+            AutoEllipsis = true,
+            Size = new Size(Math.Max(120, ContentWidth - 100 - 8 - 205 - 8 - 215 - 12), 18),
             Location = new Point(0, 6),
         };
 
