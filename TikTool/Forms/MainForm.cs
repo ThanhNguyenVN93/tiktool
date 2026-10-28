@@ -179,8 +179,8 @@ public sealed class MainForm : Form
             BackColor = Color.Transparent,
         };
         _btnUpdateNow = MakeUpdateButton(Theme.Accent, Color.White, 150);
-        _btnUpdateInfo = MakeUpdateButton(ColorTranslator.FromHtml("#2a2a2a"), Theme.TextSecondary, 110);
-        _btnUpdateInfo.Text = T("Có gì mới", "What's new");
+        _btnUpdateInfo = MakeUpdateButton(ColorTranslator.FromHtml("#2a2a2a"), Theme.TextSecondary, 150);
+        _btnUpdateInfo.Text = T("Có gì mới / tải tay", "What's new / manual");
         _btnUpdateLater = MakeUpdateButton(ColorTranslator.FromHtml("#2a2a2a"), Theme.TextSecondary, 90);
         _btnUpdateLater.Text = T("Để sau", "Later");
 
@@ -260,7 +260,7 @@ public sealed class MainForm : Form
         {
             case UpdateStatus.Available:
                 _updateText.Text = T($"Có bản mới {info.Tag} (bạn đang dùng v{AppVersion.Text}).", $"A new version {info.Tag} is available (you have v{AppVersion.Text}).");
-                _btnUpdateNow.Text = T("Cập nhật ngay", "Update now");
+                _btnUpdateNow.Text = T("Tải về", "Download");
                 break;
             case UpdateStatus.Downloading:
                 _updateText.Text = T($"Đang tải {info.Tag}… {UpdateController.Progress:P0}", $"Downloading {info.Tag}… {UpdateController.Progress:P0}");
@@ -268,7 +268,7 @@ public sealed class MainForm : Form
             case UpdateStatus.Ready:
                 _updateText.Text = auto
                     ? T($"{info.Tag} đã tải xong và được kiểm tra. Sẽ tự cài vào lần mở app kế tiếp, hoặc cài ngay.", $"{info.Tag} is downloaded and verified. It installs the next time you open the app, or install it now.")
-                    : T($"{info.Tag} đã tải xong và được kiểm tra.", $"{info.Tag} is downloaded and verified.");
+                    : T($"{info.Tag} đã tải xong và được kiểm tra. Cài bây giờ?", $"{info.Tag} is downloaded and verified. Install it now?");
                 _btnUpdateNow.Text = T("Khởi động lại && cập nhật", "Restart && update");
                 break;
             default:
@@ -290,10 +290,12 @@ public sealed class MainForm : Form
         {
             if (UpdateController.Status != UpdateStatus.Ready)
             {
+                // Download only; installing is a second, explicit step once the user sees it is ready.
                 await UpdateController.DownloadAsync();
+                return;
             }
 
-            if (UpdateController.Status != UpdateStatus.Ready || UpdateController.Info is not { } info)
+            if (UpdateController.Info is not { } info)
             {
                 return;
             }
@@ -306,7 +308,8 @@ public sealed class MainForm : Form
                 T($"Cập nhật lên {info.Tag} bây giờ? App sẽ tự khởi động lại.{running}", $"Update to {info.Tag} now? The app restarts by itself.{running}"),
                 T("Social Toolkit — Cập nhật", "Social Toolkit — Update"),
                 MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question);
+                MessageBoxIcon.Question,
+                MessageBoxDefaultButton.Button2);
             if (ask != DialogResult.Yes)
             {
                 return;
