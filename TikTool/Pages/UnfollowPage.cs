@@ -549,8 +549,8 @@ internal sealed class UnfollowPage : UserControl
         UpdateButtonStates();
         _cts = new CancellationTokenSource();
         var reloadCt = _cts.Token;
-        _log.Log(T("[Playwright] Đang mở Chrome thật (sẽ hiện cửa sổ) và inject cookie...",
-                    "[Playwright] Opening real Chrome (a window will appear) and injecting cookie..."), LogLevel.Info);
+        _log.Log(T("[Playwright] Đang mở trình duyệt (sẽ hiện cửa sổ) và nạp cookie...",
+                    "[Playwright] Opening the browser (a window will appear) and loading the cookie..."), LogLevel.Info);
 
         try
         {
