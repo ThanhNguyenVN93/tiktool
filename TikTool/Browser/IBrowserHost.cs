@@ -15,6 +15,19 @@ internal interface IBrowserHost : IAsyncDisposable
     /// False when every call gets its own tab (Chrome) and reads may run in parallel.</summary>
     bool WorkerRunsOneAtATime { get; }
 
+    /// <summary>The window can be hidden (WebView2) or not (a separate Chrome window).</summary>
+    bool CanHide { get; }
+
+    /// <summary>Whether the work window is currently shown on screen.</summary>
+    bool IsVisible { get; }
+
+    /// <summary>Start with the work window hidden (set before <see cref="StartAsync"/>); ignored when the window cannot be hidden.</summary>
+    bool StartHidden { get; set; }
+
+    /// <summary>Shows the window on top, or hides it. A hidden window keeps working normally (measured: frames, scroll events, IntersectionObserver,
+    /// timers, clicks and navigation behave the same as when it is visible).</summary>
+    Task SetVisibleAsync(bool visible, CancellationToken ct);
+
     /// <summary>Starts the browser with a persistent profile folder and returns the Playwright context attached to it.</summary>
     Task<IBrowserContext> StartAsync(IPlaywright playwright, string profileDir, string windowTitle, CancellationToken ct);
 
@@ -29,7 +42,8 @@ internal interface IBrowserHost : IAsyncDisposable
 
 internal static class BrowserHosts
 {
-    public static IBrowserHost Create(bool embedded) => embedded ? new WebViewBrowserHost() : new ChromeBrowserHost();
+    public static IBrowserHost Create(bool embedded, bool startHidden = false) =>
+        embedded ? new WebViewBrowserHost { StartHidden = startHidden } : new ChromeBrowserHost();
 
     /// <summary>The setting says "built-in browser" AND the WebView2 runtime is there (it ships with Windows 11 and current Windows 10).</summary>
     public static bool UseEmbedded(AppSettings settings) => settings.UseEmbeddedBrowser && EmbeddedAvailable();

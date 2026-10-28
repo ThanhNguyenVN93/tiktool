@@ -34,6 +34,7 @@ internal sealed class SettingsPage : UserControl
     private Guna2ToggleSwitch _startWithWindowsToggle = null!;
     private Guna2ToggleSwitch _minimizeToTrayToggle = null!;
     private Guna2ToggleSwitch _embeddedBrowserToggle = null!;
+    private Guna2ToggleSwitch _runHiddenToggle = null!;
 
     private Label _savedInfo = null!;
 
@@ -260,12 +261,16 @@ internal sealed class SettingsPage : UserControl
     private List<Control> BuildBrowserRows()
     {
         _embeddedBrowserToggle = BuildToggle();
+        _runHiddenToggle = BuildToggle();
 
         return new List<Control>
         {
             BuildRow("🌐", T("Dùng trình duyệt tích hợp (thử nghiệm)", "Use the built-in browser (beta)"),
                 T("Không cần Chrome: TikTok và YouTube chạy trong cửa sổ của app (cần WebView2, có sẵn trên Windows 11). Đăng nhập ở tab Tài khoản. Áp dụng cho lần chạy tiếp theo.",
                   "No Chrome needed: TikTok and YouTube run in an app window (needs WebView2, included with Windows 11). Sign in on the Accounts tab. Applies the next time you run."), _embeddedBrowserToggle),
+            BuildRow("🫥", T("Chạy trình duyệt ngầm", "Run the browser in the background"),
+                T("Cửa sổ trình duyệt làm việc ẩn đi (vẫn chạy bình thường). Có nút nhỏ ở thanh dưới của trang Bỏ theo dõi / YouTube để hiện lại. Áp dụng cho lần chạy tiếp theo.",
+                  "The working browser window stays hidden (it works the same). A small button on the bottom bar of the Unfollow / YouTube pages shows it again. Applies the next time you run."), _runHiddenToggle),
         };
     }
     private List<Control> BuildLogRows()
@@ -432,6 +437,7 @@ internal sealed class SettingsPage : UserControl
         _startWithWindowsToggle.Checked = s.StartWithWindows;
         _minimizeToTrayToggle.Checked = s.MinimizeToTray;
         _embeddedBrowserToggle.Checked = s.UseEmbeddedBrowser;
+        _runHiddenToggle.Checked = s.RunBrowserHidden;
 
         _languageCombo.SelectedIndex = s.Language == "en" ? 1 : 0;
     }
@@ -465,6 +471,7 @@ internal sealed class SettingsPage : UserControl
         s.StartWithWindows = _startWithWindowsToggle.Checked;
         s.MinimizeToTray = _minimizeToTrayToggle.Checked;
         s.UseEmbeddedBrowser = _embeddedBrowserToggle.Checked;
+        s.RunBrowserHidden = _runHiddenToggle.Checked;
 
         var newLang = _languageCombo.SelectedIndex == 1 ? "en" : "vi";
         var langChanged = newLang != s.Language;

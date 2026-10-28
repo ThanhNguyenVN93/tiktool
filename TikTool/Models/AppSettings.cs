@@ -26,6 +26,8 @@ public class AppSettings
 
     // Browser: false = the installed Chrome/Edge as a separate window, true = the built-in WebView2 window
     public bool UseEmbeddedBrowser { get; set; } = true;
+    // The built-in browser's work window starts hidden (the page has a button to show it; it also appears by itself when a captcha needs the user)
+    public bool RunBrowserHidden { get; set; }
 
     // App
     public bool StartWithWindows { get; set; }

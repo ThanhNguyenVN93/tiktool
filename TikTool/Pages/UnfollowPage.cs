@@ -46,6 +46,8 @@ internal sealed class UnfollowPage : UserControl
     private System.Windows.Forms.Timer _searchTimer = null!;
     private Guna2Button _btnSelectShown = null!;
     private Guna2Button _btnCheckDates = null!;
+    private Guna2Button _btnBrowser = null!;
+    private readonly ToolTip _browserTip = new();
     private readonly LastPostCache _dateCache = new();
 
     public UnfollowPage(
@@ -57,6 +59,7 @@ internal sealed class UnfollowPage : UserControl
         SessionStateService sessionStateService)
     {
         _playwright = playwright;
+        _playwright.BrowserStateChanged += UpdateButtonStates;
         _apiService = apiService;
         _cookieService = cookieService;
         _settingsService = settingsService;
@@ -109,6 +112,11 @@ internal sealed class UnfollowPage : UserControl
                 ? T($"📅  Kiểm tra ngày ({needDates})", $"📅  Check dates ({needDates})")
                 : T("📅  Đã đủ ngày đăng", "📅  All dates known");
             _btnClearSelection.Enabled = !_isBusy && anySelected;
+            _btnBrowser.Visible = _playwright.BrowserCanHide;
+            _btnBrowser.Text = _playwright.BrowserVisible ? "🙈" : "👁";
+            _browserTip.SetToolTip(_btnBrowser, _playwright.BrowserVisible
+                ? T("Ẩn cửa sổ trình duyệt (vẫn chạy bình thường)", "Hide the browser window (it keeps working)")
+                : T("Hiện cửa sổ trình duyệt", "Show the browser window"));
             _btnStart.Enabled = _isBusy || selectedCount > 0;
             _btnStart.Text = _isBusy
                 ? T("⏹  Dừng", "⏹  Stop")
@@ -487,7 +495,22 @@ internal sealed class UnfollowPage : UserControl
         };
         _btnCheckDates.Click += async (_, _) => await CheckLastPostDatesAsync();
 
+        _btnBrowser = new Guna2Button
+        {
+            Text = "👁",
+            Font = new Font("Segoe UI Emoji", 10f),
+            Size = new Size(36, 32),
+            Location = new Point(104, 12),
+            FillColor = ColorTranslator.FromHtml("#1a1a1a"),
+            ForeColor = Theme.TextSecondary,
+            BorderRadius = 7,
+            Cursor = Cursors.Hand,
+            Visible = false,
+        };
+        _btnBrowser.Click += async (_, _) => await _playwright.SetBrowserVisibleAsync(!_playwright.BrowserVisible);
+
         bar.Controls.Add(_actionInfo);
+        bar.Controls.Add(_btnBrowser);
         bar.Controls.Add(_btnClearSelection);
         bar.Controls.Add(_btnCheckDates);
         bar.Controls.Add(_btnStart);
@@ -629,7 +652,7 @@ internal sealed class UnfollowPage : UserControl
     {
         await _playwright.DisposeAsync();
         await EnsureChromeAsync();
-        await _playwright.LaunchAsync(cookie, BrowserHosts.UseEmbedded(_settingsService.Current));
+        await _playwright.LaunchAsync(cookie, BrowserHosts.UseEmbedded(_settingsService.Current), _settingsService.Current.RunBrowserHidden);
     }
 
     private async Task EnsurePlaywrightAsync(TikTokCookie cookie)
@@ -637,7 +660,7 @@ internal sealed class UnfollowPage : UserControl
         if (_playwright.IsLaunched) return;
         await _playwright.DisposeAsync();
         await EnsureChromeAsync();
-        await _playwright.LaunchAsync(cookie, BrowserHosts.UseEmbedded(_settingsService.Current));
+        await _playwright.LaunchAsync(cookie, BrowserHosts.UseEmbedded(_settingsService.Current), _settingsService.Current.RunBrowserHidden);
     }
 
     /// <summary>Ensures Chrome/Edge is installed — downloads and installs silently if not found.

@@ -21,15 +21,35 @@ internal sealed class YouTubeService : IAsyncDisposable
 
     private IBrowserHost? _host;
     private readonly bool _embedded;
+    private readonly bool _startHidden;
     private IPlaywright? _playwright;
     private IBrowserContext? _context;
     private IPage? _feedPage;
     private IPage? _agePage;
 
     /// <param name="useEmbeddedBrowser">true = the built-in WebView2 window, false = the installed Chrome/Edge as a separate window.</param>
-    public YouTubeService(bool useEmbeddedBrowser = false)
+    public YouTubeService(bool useEmbeddedBrowser = false, bool startHidden = false)
     {
         _embedded = useEmbeddedBrowser;
+        _startHidden = startHidden;
+    }
+
+    /// <summary>Raised when the browser window is shown or hidden.</summary>
+    public event Action? BrowserStateChanged;
+
+    public bool BrowserCanHide => _host is { CanHide: true };
+
+    public bool BrowserVisible => _host?.IsVisible ?? false;
+
+    public async Task SetBrowserVisibleAsync(bool visible)
+    {
+        if (_host is null)
+        {
+            return;
+        }
+
+        await _host.SetVisibleAsync(visible, CancellationToken.None);
+        BrowserStateChanged?.Invoke();
     }
 
     public bool IsConnected => _feedPage is not null;
@@ -46,7 +66,7 @@ internal sealed class YouTubeService : IAsyncDisposable
         try
         {
             _playwright = await Playwright.CreateAsync();
-            _host = BrowserHosts.Create(_embedded);
+            _host = BrowserHosts.Create(_embedded, _startHidden);
             _context = await _host.StartAsync(
                 _playwright,
                 _embedded ? AppPaths.YouTubeWebViewDir : AppPaths.YouTubeProfileDir,

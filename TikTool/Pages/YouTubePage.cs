@@ -47,6 +47,8 @@ internal sealed class YouTubePage : UserControl
     private Guna2Button _btnExport = null!;
     private Guna2Button _btnClear = null!;
     private Guna2Button _btnPrimary = null!;
+    private Guna2Button _btnBrowser = null!;
+    private readonly ToolTip _browserTip = new();
 
     public YouTubePage(SettingsService settings, HistoryService history)
     {
@@ -327,7 +329,19 @@ internal sealed class YouTubePage : UserControl
         _btnExport = MakeButton(T("💾  Xuất CSV", "💾  Export CSV"), new Size(140, 32), new Point(ContentWidth - 210 - 8 - 110 - 8 - 140, 12), quiet, Theme.TextSecondary);
         _btnExport.Click += (_, _) => ExportCsv();
 
+        _btnBrowser = MakeButton("👁", new Size(36, 32), new Point(104, 12), ColorTranslator.FromHtml("#1a1a1a"), Theme.TextSecondary);
+        _btnBrowser.Font = new Font("Segoe UI Emoji", 10f);
+        _btnBrowser.Visible = false;
+        _btnBrowser.Click += async (_, _) =>
+        {
+            if (_service is not null)
+            {
+                await _service.SetBrowserVisibleAsync(!_service.BrowserVisible);
+            }
+        };
+
         bar.Controls.Add(_actionInfo);
+        bar.Controls.Add(_btnBrowser);
         bar.Controls.Add(_btnExport);
         bar.Controls.Add(_btnClear);
         bar.Controls.Add(_btnPrimary);
@@ -355,6 +369,13 @@ internal sealed class YouTubePage : UserControl
 
         _btnConnect.Enabled = !_isBusy;
         _btnConnect.Text = _loadedOnce ? T("🔄  Tải lại", "🔄  Reload") : T("🔌  Kết nối", "🔌  Connect");
+        var canHide = _service?.BrowserCanHide ?? false;
+        var shown = _service?.BrowserVisible ?? false;
+        _btnBrowser.Visible = canHide;
+        _btnBrowser.Text = shown ? "🙈" : "👁";
+        _browserTip.SetToolTip(_btnBrowser, shown
+            ? T("Ẩn cửa sổ trình duyệt (vẫn chạy bình thường)", "Hide the browser window (it keeps working)")
+            : T("Hiện cửa sổ trình duyệt", "Show the browser window"));
         _btnSelectInactive.Enabled = !_isBusy && anyInactive;
         _btnSelectShown.Enabled = !_isBusy && hasChannels;
         _btnClear.Enabled = !_isBusy && _channels.Any(c => c.IsSelected);
@@ -593,7 +614,11 @@ internal sealed class YouTubePage : UserControl
             _service = null;
         }
 
-        _service ??= new YouTubeService(BrowserHosts.UseEmbedded(_settings.Current));
+        _service ??= new YouTubeService(BrowserHosts.UseEmbedded(_settings.Current), _settings.Current.RunBrowserHidden);
+        _service.BrowserStateChanged += () =>
+        {
+            if (InvokeRequired) BeginInvoke(UpdateButtonStates); else UpdateButtonStates();
+        };
         progress.Report(T("Đang mở trình duyệt riêng...", "Opening the separate browser window..."));
         await _service.ConnectAsync(progress, ct);
 

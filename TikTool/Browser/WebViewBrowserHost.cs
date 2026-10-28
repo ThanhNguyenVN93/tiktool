@@ -14,6 +14,27 @@ internal sealed class WebViewBrowserHost : IBrowserHost
 
     public bool WorkerRunsOneAtATime => true;
 
+    public bool CanHide => true;
+
+    public bool IsVisible => _window is { IsOpen: true, IsShown: true };
+
+    public bool StartHidden { get; set; }
+
+    public async Task SetVisibleAsync(bool visible, CancellationToken ct)
+    {
+        var window = _window;
+        if (window is null)
+        {
+            return;
+        }
+
+        await UiThread.InvokeAsync(() =>
+        {
+            window.SetVisible(visible);
+            return Task.CompletedTask;
+        });
+    }
+
     public async Task<IBrowserContext> StartAsync(IPlaywright playwright, string profileDir, string windowTitle, CancellationToken ct)
     {
         if (!BrowserHosts.EmbeddedAvailable())
@@ -24,7 +45,7 @@ internal sealed class WebViewBrowserHost : IBrowserHost
         }
 
         var session = WebViewSessions.For(profileDir);
-        _window = await UiThread.InvokeAsync(() => BrowserWindow.OpenAsync(session, windowTitle));
+        _window = await UiThread.InvokeAsync(() => BrowserWindow.OpenAsync(session, windowTitle, StartHidden));
 
         var browser = await BrowserCdp.ConnectAsync(playwright, session.Port, ct);
         _context = browser.Contexts.FirstOrDefault()
@@ -84,7 +105,7 @@ internal sealed class WebViewBrowserHost : IBrowserHost
             {
                 await UiThread.InvokeAsync(() =>
                 {
-                    window.Close();
+                    window.CloseForReal();
                     return Task.CompletedTask;
                 });
             }

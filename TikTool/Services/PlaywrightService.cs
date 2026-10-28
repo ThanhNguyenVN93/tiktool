@@ -35,8 +35,27 @@ public sealed class PlaywrightService : IAsyncDisposable
     /// <summary>True while the browser is up. A closed window counts as not launched, so the next run starts a fresh one.</summary>
     public bool IsLaunched => _page is not null && _host is { IsRunning: true };
 
+    /// <summary>Raised when the browser starts, stops, or its window is shown or hidden (may come from any thread).</summary>
+    public event Action? BrowserStateChanged;
+
+    /// <summary>The work window can be hidden (built-in browser only).</summary>
+    public bool BrowserCanHide => _host is { CanHide: true };
+
+    public bool BrowserVisible => _host?.IsVisible ?? false;
+
+    public async Task SetBrowserVisibleAsync(bool visible)
+    {
+        if (_host is null)
+        {
+            return;
+        }
+
+        await _host.SetVisibleAsync(visible, CancellationToken.None);
+        BrowserStateChanged?.Invoke();
+    }
+
     /// <param name="embedded">true = the built-in WebView2 window (its profile folder is shared with the Accounts tab), false = the installed Chrome/Edge with a throwaway profile.</param>
-    public async Task LaunchAsync(TikTokCookie cookie, bool embedded = false)
+    public async Task LaunchAsync(TikTokCookie cookie, bool embedded = false, bool startHidden = false)
     {
         TryFlushDnsCache();
 
@@ -61,10 +80,11 @@ public sealed class PlaywrightService : IAsyncDisposable
         }
 
         _playwright = await Playwright.CreateAsync();
-        _host = BrowserHosts.Create(embedded);
+        _host = BrowserHosts.Create(embedded, startHidden);
         _context = await _host.StartAsync(_playwright, profile, T("Social Toolkit — Trình duyệt TikTok", "Social Toolkit — TikTok browser"), CancellationToken.None);
         await _context.AddCookiesAsync(BuildCookies(cookie));
         _page = await _host.GetMainPageAsync(CancellationToken.None);
+        BrowserStateChanged?.Invoke();
 
         // Warm-up: this profile dir is brand new every launch (only cookies were injected, no
         // localStorage/device fingerprint), and navigating straight to a deep page like a profile
@@ -1507,4 +1527,5 @@ public sealed class PlaywrightService : IAsyncDisposable
         _playwright = null;
         _host = null;
         _profileDir = null;
+        BrowserStateChanged?.Invoke();
     }}
