@@ -38,6 +38,19 @@ internal static class AppPaths
         }
     }
 
+    public static string YouTubeAgesFile => Path.Combine(AppDataDir, "youtube_ages.dat");
+    public static string YouTubeProtectedFile => Path.Combine(AppDataDir, "youtube_protected.dat");
+
+    public static string YouTubeBackupDir
+    {
+        get
+        {
+            var dir = Path.Combine(AppDataDir, "youtube_backups");
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+    }
+
     public static string YouTubeProfileDir
     {
         get
