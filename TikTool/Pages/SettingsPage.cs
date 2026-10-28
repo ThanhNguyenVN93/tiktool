@@ -298,8 +298,8 @@ internal sealed class SettingsPage : UserControl
                 T("Hỏi GitHub xem có bản phát hành mới không. Chỉ một yêu cầu, không gửi dữ liệu của bạn.",
                   "Asks GitHub whether a newer release exists. One request; none of your data is sent."), _checkUpdatesToggle),
             BuildRow("⬇️", T("Tự động cài bản mới", "Install updates automatically"),
-                T("Tải bản mới ở nền, kiểm tra SHA256, rồi cài vào lần mở app kế tiếp. Tắt thì app chỉ báo và bạn bấm Cập nhật.",
-                  "Downloads a new version in the background, checks its SHA256 and installs it the next time the app starts. Off: the app only tells you and you press Update."), _autoInstallToggle),
+                T("Tải bản mới ở nền, kiểm tra SHA256, rồi cài vào lần mở app kế tiếp. Mặc định TẮT: app chỉ báo, bạn bấm Tải về rồi xác nhận cài.",
+                  "Downloads a new version in the background, checks its SHA256 and installs it the next time the app starts. Off by default: the app only tells you, you press Download and then confirm the install."), _autoInstallToggle),
             BuildRow("ℹ️", T($"Phiên bản hiện tại: v{AppVersion.Text}", $"Current version: v{AppVersion.Text}"),
                 T("Xem ngay có bản mới không.", "Look for a newer version now."), check),
         };

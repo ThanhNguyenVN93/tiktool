@@ -176,12 +176,12 @@ internal sealed class GuidePage : UserControl
             T("Báo bản mới và tự cài", "New-version notice and automatic install"),
             new[]
             {
-                T("Khi mở app, nếu có bản mới trên GitHub, đầu cửa sổ hiện dải \"Có bản mới\" với nút Cập nhật ngay, Có gì mới và Để sau. App chỉ gửi một yêu cầu tới GitHub, không gửi dữ liệu của bạn.",
-                  "When the app starts and GitHub has a newer release, a bar at the top of the window offers Update now, What's new and Later. The app sends one request to GitHub and none of your data."),
-                T("Cập nhật ngay: app tải zip, kiểm tra SHA256 (sai là bỏ, không cài), giải nén an toàn, hỏi xác nhận, thay file rồi tự khởi động lại. Lỗi ở bước nào thì hoàn tác hết, app vẫn như cũ.",
-                  "Update now: the app downloads the zip, checks its SHA256 (a mismatch is discarded, nothing is installed), unpacks it safely, asks you to confirm, swaps the files and restarts by itself. A failure at any step is rolled back and the app stays as it was."),
-                T("Cài đặt → Cập nhật: bật tắt việc kiểm tra khi mở app và việc tự cài (bản mới tải ở nền, cài vào lần mở app kế tiếp). Nút Kiểm tra ngay hỏi GitHub liền.",
-                  "Settings → Updates: turn the check at start and the automatic install on or off (a new version is downloaded in the background and installed the next time you start the app). Check now asks GitHub right away."),
+                T("Khi mở app, nếu có bản mới trên GitHub, đầu cửa sổ hiện dải \"Có bản mới\" với nút Tải về, Có gì mới / tải tay và Để sau. App chỉ gửi một yêu cầu tới GitHub, không gửi dữ liệu của bạn.",
+                  "When the app starts and GitHub has a newer release, a bar at the top of the window offers Download, What's new / manual and Later. The app sends one request to GitHub and none of your data."),
+                T("Tải về: app tải zip, kiểm tra SHA256 (sai là bỏ, không cài), giải nén an toàn. Xong, dải đổi thành \"Khởi động lại và cập nhật\": bấm, xác nhận (mặc định Không), app thay file rồi tự khởi động lại. Lỗi ở bước nào thì hoàn tác hết, app vẫn như cũ.",
+                  "Download: the app downloads the zip, checks its SHA256 (a mismatch is discarded, nothing is installed) and unpacks it safely. Then the bar offers \"Restart and update\": press it, confirm (default No), and the app swaps the files and restarts by itself. A failure at any step is rolled back and the app stays as it was."),
+                T("Cài đặt → Cập nhật: bật tắt việc kiểm tra khi mở app và việc tự cài (mặc định tắt; bản mới tải ở nền, cài vào lần mở app kế tiếp). Nút Kiểm tra ngay hỏi GitHub liền.",
+                  "Settings → Updates: turn the check at start and the automatic install on or off (off by default; a new version is downloaded in the background and installed the next time you start the app). Check now asks GitHub right away."),
                 T("Dữ liệu trong %APPDATA%\\TikTool không bị đụng tới; yt-dlp.exe và ffmpeg.exe không bao giờ bị thay. Muốn cập nhật tay: tải zip mới ở trang Release và giải nén đè lên thư mục cũ. Lỗi: xem logs\\update.log.",
                   "Your data in %APPDATA%\\TikTool is never touched; yt-dlp.exe and ffmpeg.exe are never replaced. To update by hand: download the new zip from the Release page and unzip it over the old folder. Problems: see logs\\update.log."),
             }));

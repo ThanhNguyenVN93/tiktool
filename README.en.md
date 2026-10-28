@@ -19,9 +19,9 @@ The display name is **Social Toolkit**; the executable and the data folder are s
 
 ## 1b. Updating
 
-- When the app starts and GitHub has a newer release, a bar at the top of the window says **"A new version vX is available"** with **Update now**, **What's new** (opens the Release page) and **Later**. The app sends **one request** to GitHub and none of your data.
-- **Update now**: the app downloads the zip, **checks its SHA256** against the `.sha256` file of the release (a mismatch discards the file, nothing is installed), unpacks it safely, asks you to confirm, swaps the changed files and **restarts by itself**. If any step fails **everything is rolled back** and the app stays as it was.
-- **Install automatically** (on by default, can be turned off in *Settings → Updates*): the new version is downloaded in the background and **installed the next time you start the app**.
+- When the app starts and GitHub has a newer release, a bar at the top of the window says **"A new version vX is available"** with **Download**, **What's new / manual** (opens the Release page, where the zip is) and **Later**. The app sends **one request** to GitHub and none of your data.
+- **Download**: the app downloads the zip, **checks its SHA256** against the `.sha256` file of the release (a mismatch discards the file, nothing is installed), unpacks it safely. Then press **Restart and update**, confirm (default No), and the app swaps the changed files and **restarts by itself**. If any step fails **everything is rolled back** and the app stays as it was.
+- **Install automatically** (**off** by default, turn it on in *Settings → Updates*; some antivirus products may warn about files being replaced): the new version is downloaded in the background and **installed the next time you start the app**.
 - Your data in `%APPDATA%\TikTool\` is never touched. `Resources\yt-dlp.exe` and `ffmpeg.exe` are never replaced (you or yt-dlp itself own them).
 - A stable install is never moved to a pre-release. To update by hand: download the new zip from the Release page and unzip it over the old folder.
 - If an update fails or cannot be installed, look at `logs\update.log`.
@@ -70,7 +70,7 @@ Paste links (several, one per line), pick MP4 / MP3 / MKV, choose the folder and
 | Start with Windows / minimize to tray | Optional; the tray menu has shortcuts to the tabs |
 | Language | English (default) or Vietnamese (the app restarts by itself) |
 | Logs → Open folder | Opens the log folder |
-| Updates | Check for updates when the app starts (on), install automatically (on), a *Check now* button |
+| Updates | Check for updates when the app starts (on), install automatically (off), a *Check now* button |
 
 ## 8. Where data is kept, privacy
 

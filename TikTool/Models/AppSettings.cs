@@ -31,7 +31,7 @@ public class AppSettings
 
     // Updates: look for a newer release when the app starts; download it in the background and install it the next time the app starts
     public bool CheckForUpdates { get; set; } = true;
-    public bool AutoInstallUpdates { get; set; } = true;
+    public bool AutoInstallUpdates { get; set; } = false;
 
     // App
     public bool StartWithWindows { get; set; }
