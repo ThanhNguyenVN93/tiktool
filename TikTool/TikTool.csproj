@@ -24,6 +24,18 @@
        are never needed. Override the target with an empty one to skip the download. -->
   <Target Name="PlaywrightInstall" />
 
+  <!-- The Playwright package ships installer helpers for browsers on every operating system (PrintDeps.exe, reinstall_*.sh, reinstall_*.ps1).
+       This app attaches to a browser that is already running and never installs one, so it does not use them; and security products flag some of
+       them (Kaspersky deleted reinstall_msedge_dev_mac.sh and PrintDeps.exe from the unpacked release). Leave them out of every build and publish. -->
+  <Target Name="DropPlaywrightInstallHelpers" AfterTargets="Build;Publish">
+    <ItemGroup>
+      <PlaywrightHelperFile Include="$(OutDir).playwright\package\bin\**" />
+      <PlaywrightHelperFile Include="$(PublishDir).playwright\package\bin\**" Condition="'$(PublishDir)' != ''" />
+    </ItemGroup>
+    <Delete Files="@(PlaywrightHelperFile)" ContinueOnError="true" />
+    <RemoveDir Directories="$(OutDir).playwright\package\bin;$(PublishDir).playwright\package\bin" ContinueOnError="true" />
+  </Target>
+
   <ItemGroup>
     <PackageReference Include="Guna.UI2.WinForms" Version="2.0.4.6" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.10" />

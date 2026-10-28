@@ -84,6 +84,7 @@ Thứ tự khởi tạo service trong `MainForm` (không đảo): Settings → C
 
 ## 7. Bẫy khi làm việc với Claude / công cụ
 - **Ứng dụng Claude (MSIX) thấy bản sao CŨ của một số file trong `%APPDATA%\TikTool`** (`session_resume.dat`, `history.dat`, `tiktool_session*.log`...). Đừng kết luận "ghi không được"/"bị Kaspersky chặn": ghi chú Kaspersky cũ rất có thể là hiện tượng này. Muốn đọc file thật, nhờ người dùng chạy trong terminal của họ: `Copy-Item "$env:APPDATA\TikTool\<file>" D:\code\frm_tiktool\TikTool\bin\<tên> -Force`. File MỚI (`logs\`, `avatars\`...) đọc đúng. Log chẩn đoán đọc từ `logs\session_*.log`.
+- **Kaspersky trên máy tác giả xóa file của gói Playwright** (`reinstall_msedge_dev_mac.sh`, `PrintDeps.exe`... trong `.playwright\package\bin`) mỗi khi giải nén/chạy bản sao, và có vẻ cũng xóa một script PowerShell thử nghiệm (đổi tên file, chép app, mở bản mới). Thư mục `bin` đó chỉ chứa công cụ CÀI trình duyệt cho mọi hệ điều hành, app không dùng (đã thử: Playwright vẫn gắn vào WebView2, bấm, mở trang bình thường khi thiếu nó), nên `TikTool.csproj` có target `DropPlaywrightInstallHelpers` xóa nó khỏi mọi build/publish (beta.1/beta.2 còn chứa). Đừng thêm lại. Khi cần thử luồng "đổi tên + thay file + mở bản mới" hãy làm bằng mã .NET (chạy được), không bằng script PowerShell.
 - Hook của phiên worktree từng chặn Edit/Write vào thư mục chính; ghi file bằng PowerShell khi người dùng đã cho phép.
 - `Process.Start` với Playwright: Chrome do tool mở phải được đóng bằng CDP `Browser.close` (không kill) để profile lưu cookie đúng.
 
