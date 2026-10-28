@@ -3,8 +3,7 @@ namespace TikTool.Models;
 public class AppSettings
 {
     // Download
-    public string DefaultOutputDir { get; set; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "TikTool");
+    public string DefaultOutputDir { get; set; } = TikTool.Services.AppPaths.DefaultDownloadDir;
     public string DefaultFormat { get; set; } = "mp4";
     public int ConcurrentDownloads { get; set; } = 2;
     public bool AutoUpdateYtDlp { get; set; } = true;

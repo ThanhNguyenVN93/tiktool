@@ -280,7 +280,7 @@ internal sealed class DownloadPage : UserControl
             ForeColor = Theme.TextPrimary,
             BorderStyle = BorderStyle.FixedSingle,
             Font = Theme.FontRegular,
-            Text = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "TikTool"),
+            Text = AppPaths.DefaultDownloadDir,
         };
 
         var btnChoose = new Guna2Button

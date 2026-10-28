@@ -2,15 +2,30 @@ namespace TikTool.Services;
 
 internal static class AppPaths
 {
+    /// <summary>Portable mode: a file named <c>portable.flag</c> next to the exe (made by portable.bat) keeps every piece of user data in a <c>Data</c> folder next to the exe instead of %APPDATA%.</summary>
+    public static bool IsPortable => File.Exists(Path.Combine(AppContext.BaseDirectory, PortableFlagName));
+
+    internal const string PortableFlagName = "portable.flag";
+
+    internal static string ResolveDataDir(string baseDir, string roamingAppData) =>
+        File.Exists(Path.Combine(baseDir, PortableFlagName))
+            ? Path.Combine(baseDir, "Data")
+            : Path.Combine(roamingAppData, "TikTool");
+
     public static string AppDataDir
     {
         get
         {
-            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TikTool");
+            var dir = ResolveDataDir(AppContext.BaseDirectory, Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
             Directory.CreateDirectory(dir);
             return dir;
         }
     }
+
+    /// <summary>Where downloaded videos go until the user picks a folder: Videos\TikTool, or Data\Downloads in portable mode.</summary>
+    public static string DefaultDownloadDir => IsPortable
+        ? Path.Combine(AppDataDir, "Downloads")
+        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "TikTool");
 
     public static string CookieFile => Path.Combine(AppDataDir, "cookie.dat");
     public static string SettingsFile => Path.Combine(AppDataDir, "settings.dat");
