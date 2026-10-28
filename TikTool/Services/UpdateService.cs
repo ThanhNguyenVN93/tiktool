@@ -11,7 +11,7 @@ namespace TikTool.Services;
 public sealed class UpdateService
 {
     private const string SelectorsUrl =
-        "https://raw.githubusercontent.com/ThanhNguyenVN93/tiktool/main/config/selectors.json";
+        "https://raw.githubusercontent.com/ThanhNguyenVN93/tiktool/master/TikTool/Config/selectors.json";
 
     private readonly YtDlpService _ytDlp;
     private readonly HttpClient _http = new();
