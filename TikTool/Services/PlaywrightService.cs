@@ -1200,14 +1200,43 @@ public sealed class PlaywrightService : IAsyncDisposable
     {
         JsonDocument? hydrationDoc = null;
         JsonDocument? apiDoc = null;
+        EventHandler<IResponse>? onItemResponse = null;
         try
         {
-            var itemListTask = page.WaitForResponseAsync(
-                r => r.Url.Contains("/api/post/item_list/") && r.Ok,
-                new PageWaitForResponseOptions { Timeout = 15_000 });
-            // Observe any fault (e.g. page closed on an early return) so it is not reported later as an
-            // unobserved task exception.
-            _ = itemListTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
+            // Read the item_list body the moment its response arrives. Read later (after the page data), the browser may
+            // already have dropped it: Network.getResponseBody then fails with "No resource with given identifier found"
+            // (seen in the built-in browser, 3 of 9 profiles). A fault is observed so it is not reported as unobserved.
+            var itemBody = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _ = itemBody.Task.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
+            onItemResponse = (_, response) =>
+            {
+                if (!response.Url.Contains("/api/post/item_list/") || !response.Ok)
+                {
+                    return;
+                }
+
+                _ = Task.Run(async () =>
+                {
+                    for (var attempt = 0; attempt < 2; attempt++)
+                    {
+                        try
+                        {
+                            itemBody.TrySetResult(await response.TextAsync());
+                            return;
+                        }
+                        catch (Exception) when (attempt == 0)
+                        {
+                            await Task.Delay(300);
+                        }
+                        catch (Exception ex)
+                        {
+                            itemBody.TrySetException(ex);
+                            return;
+                        }
+                    }
+                });
+            };
+            page.Response += onItemResponse;
 
             // The page's own user/detail request (it carries a valid signature) is a second source for the
             // same data, used when the embedded page data is missing.
@@ -1293,8 +1322,7 @@ public sealed class PlaywrightService : IAsyncDisposable
             {
                 try
                 {
-                    var response = await itemListTask;
-                    var body = await response.TextAsync();
+                    var body = await itemBody.Task.WaitAsync(TimeSpan.FromSeconds(15), ct);
                     if (string.IsNullOrWhiteSpace(body))
                     {
                         // HTTP 200 with no content: TikTok's usual way of refusing a request it considers automated /
@@ -1334,7 +1362,6 @@ public sealed class PlaywrightService : IAsyncDisposable
             else
             {
                 BumpDetailStat("no_videos");
-                _ = itemListTask.ContinueWith(_ => { }, TaskContinuationOptions.None);
             }
 
             return (userId, videoCount, lastPostUnixSeconds, relation);
@@ -1350,6 +1377,11 @@ public sealed class PlaywrightService : IAsyncDisposable
         }
         finally
         {
+            if (onItemResponse is not null)
+            {
+                page.Response -= onItemResponse;
+            }
+
             hydrationDoc?.Dispose();
             apiDoc?.Dispose();
         }
