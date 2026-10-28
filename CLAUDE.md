@@ -18,7 +18,7 @@ dotnet test TikTool.Tests/TikTool.Tests.csproj      # 36 test: đọc tuổi vid
 dotnet run --project TikTool/TikTool.csproj
 ```
 - Cần `TikTool/Resources/yt-dlp.exe` (và tùy chọn `ffmpeg.exe`), **không commit** `*.exe`.
-- Cần **Chrome hoặc Edge đã cài** (tool điều khiển chính trình duyệt đó, không tải Chromium).
+- Mặc định tool dùng **trình duyệt tích hợp WebView2** (có sẵn trên Windows 11; máy cũ có thể cần WebView2 Runtime). Tắt công tắc trong Cài đặt thì mới cần **Chrome hoặc Edge đã cài** (tool điều khiển chính trình duyệt đó, không tải Chromium).
 - Khi build kiểm tra từ công cụ khác, **dùng thư mục obj riêng** (`-p:OutDir=... -p:IntermediateOutputPath=...`) hoặc build bình thường; build ra OutDir riêng dùng chung `obj` từng làm thư mục `bin\Debug` thiếu `TikTool.deps.json` → lỗi "Could not load Microsoft.Playwright" lúc chạy. Nếu gặp: Rebuild Solution.
 - Mọi chuỗi hiển thị phải đi qua `T(vi, en)` (`LanguageService`, đã `global using static`). **Không** tự định nghĩa hàm `T` giả chỉ trả tiếng Việt (từng làm dòng kênh và trang Lịch sử bỏ qua cài đặt ngôn ngữ).
 
@@ -29,7 +29,8 @@ TikTool/
   Program.cs                 splash, AppLog, xử lý lỗi chưa bắt
   Forms/   MainForm (thanh bên, nhóm "Unfollow" mở/đóng, DI thủ công), FollowingItemControl (dòng kênh TikTok),
            YouTubeChannelRow (dòng kênh YouTube), LogPanel, NavItem, SplashForm, DonationForm, Theme
-  Pages/   DownloadPage, UnfollowPage (TikTok), YouTubePage, CookiePage, SettingsPage, HistoryPage, GuidePage
+  Pages/   DownloadPage, UnfollowPage (TikTok), YouTubePage, AccountsPage (đăng nhập TikTok + YouTube), SettingsPage, HistoryPage, GuidePage
+  Browser/ IBrowserHost (ChromeBrowserHost | WebViewBrowserHost), WebViewSession(s), BrowserWindow, BrowserCdp, UiThread
   Services/ PlaywrightService (TikTok, CDP), YouTubeService + YouTubeStore + AgeText (YouTube),
            CookieService (DPAPI, đừng sửa bừa), SessionStateService (phiên + whitelist + quota), LastPostCache,
            AvatarCache, AppLog, AppPaths, SettingsService, HistoryService, UpdateService, YtDlpService, LanguageService
@@ -39,7 +40,7 @@ TikTool.Tests/               xUnit; TikTool.csproj có InternalsVisibleTo("TikTo
 Thứ tự khởi tạo service trong `MainForm` (không đảo): Settings → Cookie → YtDlp → Playwright → TikTokApi → History → SessionState → Update. `Dock=Fill` phải `Controls.Add` TRƯỚC các control Dock Top/Bottom.
 
 ## 4. Dữ liệu người dùng (`%APPDATA%\TikTool\`)
-`cookie.dat` (DPAPI), `settings.dat`, `history.dat`, `session_resume.dat`, `whitelist.dat`, `lastpost.dat` (ngày đăng TikTok, 30 ngày), `avatars\` (logo, 30 ngày), `youtube_profile\` (**hồ sơ Chrome riêng chứa phiên Google**, xóa bằng Cài đặt → YouTube → Đăng xuất), `youtube_ages.dat` (7 ngày), `youtube_protected.dat`, `youtube_backups\*.csv`, `logs\session_*.log` (mỗi lần chạy một file mới), `debug\` (ảnh + HTML khi lỗi).
+`cookie.dat` (cookie TikTok do chính tool lấy lúc đăng nhập, mã hóa DPAPI), `tiktok_webview\` và `youtube_webview\` (hồ sơ WebView2; Google nhớ phiên ở đây, TikTok thì KHÔNG), `settings.dat`, `history.dat`, `session_resume.dat`, `whitelist.dat`, `lastpost.dat` (ngày đăng TikTok, 30 ngày), `avatars\` (logo, 30 ngày), `youtube_profile\` (hồ sơ Chrome riêng, chỉ khi tắt trình duyệt tích hợp; đăng xuất ở tab Tài khoản xóa cả hai), `youtube_ages.dat` (7 ngày), `youtube_protected.dat`, `youtube_backups\*.csv`, `logs\session_*.log` (mỗi lần chạy một file mới, dòng thời gian đầy đủ) và các log THEO LOẠI ghi nối tiếp qua nhiều lần chạy (có ngày đầy đủ, xoay vòng ở 1 MB): `tiktok.log`, `youtube.log`, `challenges.log` (captcha), `update.log`, `download.log`, `errors.log` (mọi dòng ERROR/FATAL từ bất kỳ đâu). Ghi bằng `AppLog.Write(level, text, LogCategory.X)`; `LogPanel.Category` gắn loại cho từng trang, `debug\` (ảnh + HTML khi lỗi).
 
 ## 5. TikTok — những điều đã kiểm chứng (đừng làm ngược)
 - **CDP attach Chrome/Edge thật** (`--remote-debugging-port`, profile tạm). TikTok chặn Chromium của Playwright.
@@ -52,8 +53,19 @@ Thứ tự khởi tạo service trong `MainForm` (không đảo): Settings → C
 - Unfollow: bấm trong trình duyệt (HTTP trực tiếp không dùng được: thiếu chữ ký). Kênh đã xóa (Access Denied) + có `userId` → `fetch()` ngay trong ngữ cảnh trang. Có hộp xác nhận (mặc định No), bỏ qua bạn bè (`SkipFriends`, `relation == 2`) và whitelist, giới hạn phiên/ngày, tự chờ rate limit.
 - **Chưa kiểm chứng thật**: một lượt unfollow nhiều kênh qua hộp xác nhận mới; nút "Kiểm tra ngày" vượt 36 kênh với nhịp chậm.
 
+## 5b. Trình duyệt tích hợp (WebView2) và tab Tài khoản — đã kiểm chứng
+- **Vì sao**: không còn phải cài Chrome, không còn mở/kill Chrome; quan trọng nhất là **bỏ hẳn việc giải mã cookie của Chrome/Edge thật** (tín hiệu giống phần mềm trộm tài khoản, rủi ro antivirus lớn nhất). Chrome 136+ cũng không cho bật cổng debug trên hồ sơ mặc định. Đừng thêm lại việc đọc dữ liệu của trình duyệt người dùng.
+- **Cách điều khiển giống hệt Chrome**: WebView2 bật `--remote-debugging-port`, Playwright `ConnectOverCDPAsync`. Mỗi hồ sơ có đúng **một `WebViewSession`** (môi trường + cổng, sống suốt đời app): khung đăng nhập trong tab Tài khoản và `BrowserWindow` làm việc đều lấy control từ đó (một thư mục dữ liệu chỉ mở được với một bộ tùy chọn).
+- **Trang chính tìm bằng dấu hiệu URL** (`about:blank#tiktool-main-…`), KHÔNG dùng `Pages.First()`: context còn chứa trang của các khung khác (khung đăng nhập). Việc đọc nền (hồ sơ TikTok, ngày YouTube) chạy trong **một khung phụ ẩn** (`NewWorkerPageAsync`, dùng lại, chạy từng cái một: `WorkerRunsOneAtATime`). Không dùng `NewPageAsync` trên WebView2: nó mở cửa sổ bật lên.
+- **Khung ẩn vẫn bấm/cuộn/mở trang được** (đo bằng bộ thử tự động: click, `requestAnimationFrame`, `scrollTop`, `Goto` đều đạt). Ẩn chỉ chậm hơn ~3 lần khi đọc.
+- **TikTok mất phiên khi đóng app** (Google thì giữ): tab Tài khoản bắt cookie `sessionid` qua `CookieManager`, xác thực, lưu `cookie.dat`; mỗi lần chạy `PlaywrightService.LaunchAsync` nạp lại bằng `AddCookiesAsync`. Đăng xuất TikTok = xóa `cookie.dat` + `DeleteAllCookies`. YouTube: cookie `SAPISID` cho biết đã đăng nhập (`GoogleSession` đọc bản sao cookie DB, có cờ trong bộ nhớ vì Chromium ghi cookie xuống đĩa chậm).
+- **Cổng đăng nhập**: tab Unfollow chưa đăng nhập thì `RequestLogin("tiktok"|"youtube")` mở tab Tài khoản đúng phần; mỗi nền tảng độc lập, không khóa nhau.
+- **Cửa sổ làm việc chạy ngầm được** (công tắc "Chạy trình duyệt ngầm", nút mắt 👁 ở thanh dưới trang Unfollow/YouTube). Đo ở 5 trạng thái (thu nhỏ, ẩn, ngoài màn hình, trong suốt): khung hình, sự kiện cuộn, IntersectionObserver, bộ đếm giờ, click, điều hướng đều giống hệt hiển thị (đang có Playwright gắn vào thì trang vẫn coi là hiển thị). Ở chế độ ngầm nút X chỉ ẩn cửa sổ; đóng thật phải gọi `BrowserWindow.CloseForReal()` (WinForms giữ lý do "người dùng đóng" sau một lần hủy đóng nên `Close()` thường bị hủy tiếp).
+- **Captcha** (`ChallengeGate`, `Services/ChallengeGate.cs`): mỗi bước làm việc đi qua `RunStepAsync`/`CheckpointAsync`. Thấy thử thách (phần tử nhìn thấy có chữ captcha, câu thử thách quen thuộc, trang Google "unusual traffic") thì HIỆN cửa sổ (kể cả khung đọc nền), báo (âm thanh, nhấp nháy thanh tác vụ, bong bóng khay), CHỜ KHÔNG GIỚI HẠN (người dùng có thể vắng máy) nhắc ở 1, 2, 5, 10 phút rồi 30 phút/lần, KHÔNG bao giờ chạm vào captcha hay tải lại trang (site tự cấp thử thách mới khi hết hạn: coi là cùng một lần chờ vì ta nhận biết theo "có hộp captcha hay không"). Hết thì ẩn lại, nghỉ `RateLimitWaitSeconds`, LÀM LẠI bước bị gián đoạn (hàm bỏ theo dõi làm lại an toàn vì đọc trạng thái nút trước; hủy đăng ký YouTube đã xong thì giữ, không làm lại). **Markup captcha thật của TikTok CHƯA từng thấy**: bộ nhận biết cố ý lỏng; mỗi lần gặp tự lưu ảnh + HTML vào `debug\challenge_*` (20 lần gần nhất) và dòng vào `challenges.log`; lần gặp thật đầu tiên cần đọc những file đó để chỉnh `ChallengeDetector`.
+- Công tắc **Cài đặt → Dùng trình duyệt tích hợp** (mặc định bật). Tắt = đường Chrome cũ (profile tạm cho TikTok + cookie.dat, `youtube_profile` cho YouTube). Đường Chrome là phương án dự phòng; đừng xóa trước khi người dùng thật xác nhận đường WebView2 ổn.
+- **Chưa kiểm chứng trên tài khoản thật**: bấm Unfollow/Unsubscribe thật trong cửa sổ WebView2, tải danh sách 500+ kênh TikTok bằng `BrowserWindow`, máy không có WebView2 Runtime, máy sạch.
 ## 6. YouTube — những điều đã kiểm chứng
-- Một phiên Chrome dùng xuyên suốt, **profile riêng lưu lâu dài** (`youtube_profile`), không đọc cookie, không OAuth. Google cho đăng nhập và nhớ phiên. Tab 1 giữ danh sách `youtube.com/feed/channels`, tab 2 đọc ngày đăng; luôn `BringToFrontAsync` tab đang làm việc (tab nền bị Chrome làm chậm).
+- Một phiên trình duyệt dùng xuyên suốt, **profile riêng lưu lâu dài** (`youtube_webview`, hoặc `youtube_profile` khi dùng Chrome), không đọc cookie của trình duyệt người dùng, không OAuth. Google cho đăng nhập và nhớ phiên. Tab 1 giữ danh sách `youtube.com/feed/channels`, tab 2 đọc ngày đăng; luôn `BringToFrontAsync` tab đang làm việc (tab nền bị Chrome làm chậm).
 - Danh sách: cuộn đến khi số `ytd-channel-renderer` ổn định; tên lấy từ `ytd-channel-name #text` (textContent của `ytd-channel-name` bị lặp tên do tooltip).
 - **Ngày đăng**: RSS (`feeds/videos.xml`) hiện trả 404 cho MỌI kênh (sự cố phía YouTube đã được báo cáo, không có thông báo ngừng) nên không dùng. Đọc từ tab Videos (`/videos?hl=en`, mặc định Latest): YouTube viết `13h ago`, `5d ago`, `9mo ago`, `3y ago` → `AgeText` quy ra ngày xấp xỉ.
 - **Shorts**: tab Videos không liệt kê Shorts và Shorts không có ngày. Kênh có tab Shorts mà video dài ≥ 30 ngày/không có → **`IsUncertain` ("Có Shorts — chưa rõ")**, không bao giờ tự chọn/không gọi là inactive.

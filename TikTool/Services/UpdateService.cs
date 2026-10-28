@@ -11,7 +11,7 @@ namespace TikTool.Services;
 public sealed class UpdateService
 {
     private const string SelectorsUrl =
-        "https://raw.githubusercontent.com/ThanhNguyenVN93/tiktool/main/config/selectors.json";
+        "https://raw.githubusercontent.com/ThanhNguyenVN93/tiktool/master/TikTool/Config/selectors.json";
 
     private readonly YtDlpService _ytDlp;
     private readonly HttpClient _http = new();
@@ -36,7 +36,7 @@ public sealed class UpdateService
                 return;
             }
 
-            log?.Report(T("[Update] Đang kiểm tra bản cập nhật yt-dlp...", "[Update] Checking for a yt-dlp update..."));
+            Say(log, T("[Update] Đang kiểm tra bản cập nhật yt-dlp...", "[Update] Checking for a yt-dlp update..."));
             using var process = Process.Start(new ProcessStartInfo
             {
                 FileName = _ytDlp.ExecutablePath,
@@ -53,11 +53,11 @@ public sealed class UpdateService
             }
 
             await process.WaitForExitAsync();
-            log?.Report(process.ExitCode == 0 ? T("[Update] yt-dlp đã ở bản mới nhất.", "[Update] yt-dlp is up to date.") : T("[Update] Kiểm tra yt-dlp thất bại (bỏ qua).", "[Update] yt-dlp check failed (ignored)."));
+            Say(log, process.ExitCode == 0 ? T("[Update] yt-dlp đã ở bản mới nhất.", "[Update] yt-dlp is up to date.") : T("[Update] Kiểm tra yt-dlp thất bại (bỏ qua).", "[Update] yt-dlp check failed (ignored)."));
         }
         catch (Exception ex)
         {
-            log?.Report(T($"[Update] Lỗi khi cập nhật yt-dlp: {ex.Message}", $"[Update] Error updating yt-dlp: {ex.Message}"));
+            Say(log, T($"[Update] Lỗi khi cập nhật yt-dlp: {ex.Message}", $"[Update] Error updating yt-dlp: {ex.Message}"));
         }
     }
 
@@ -77,14 +77,22 @@ public sealed class UpdateService
             {
                 await File.WriteAllTextAsync(AppPaths.SelectorsFile, remoteJson);
                 SelectorsService.Invalidate();
-                log?.Report(T($"[Update] Đã cập nhật selectors.json ({local.Version} → {remote.Version}).", $"[Update] Updated selectors.json ({local.Version} → {remote.Version})."));
+                Say(log, T($"[Update] Đã cập nhật selectors.json ({local.Version} → {remote.Version}).", $"[Update] Updated selectors.json ({local.Version} → {remote.Version})."));
             }
         }
         catch (Exception ex)
         {
             // Không có mạng, repo chưa tồn tại, hoặc JSON hỏng — bỏ qua, dùng bản local.
-            log?.Report(T($"[Update] Không thể kiểm tra selectors.json: {ex.Message}", $"[Update] Could not check selectors.json: {ex.Message}"));
+            Say(log, T($"[Update] Không thể kiểm tra selectors.json: {ex.Message}", $"[Update] Could not check selectors.json: {ex.Message}"));
         }
+    }
+
+    /// <summary>Every update message goes to update.log; the optional progress sink still gets it.</summary>
+    private static void Say(IProgress<string>? log, string message)
+    {
+        var bad = message.Contains("Lỗi") || message.Contains("Error") || message.Contains("thất bại") || message.Contains("failed") || message.Contains("Không thể") || message.Contains("Could not");
+        AppLog.Write(bad ? "WARN" : "INFO", message, LogCategory.Update);
+        log?.Report(message);
     }
 
     private static bool IsNewer(string remoteVersion, string localVersion)

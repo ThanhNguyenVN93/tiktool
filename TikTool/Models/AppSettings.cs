@@ -24,10 +24,15 @@ public class AppSettings
     public int RateLimitWaitSeconds { get; set; } = 90;
     public int MaxUnfollowsPerDay { get; set; } = 100;
 
+    // Browser: false = the installed Chrome/Edge as a separate window, true = the built-in WebView2 window
+    public bool UseEmbeddedBrowser { get; set; } = true;
+    // The built-in browser's work window starts hidden (the page has a button to show it; it also appears by itself when a captcha needs the user)
+    public bool RunBrowserHidden { get; set; }
+
     // App
     public bool StartWithWindows { get; set; }
     public bool MinimizeToTray { get; set; }
     public string Theme { get; set; } = "Dark";
-    // "vi" | "en"
-    public string Language { get; set; } = "vi";
+    // "vi" | "en" (a fresh install starts in English; the user can switch in Settings)
+    public string Language { get; set; } = "en";
 }

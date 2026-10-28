@@ -2,6 +2,7 @@
 using System.Text;
 using Guna.UI2.WinForms;
 using TikTool.Forms;
+using TikTool.Browser;
 using TikTool.Models;
 using TikTool.Services;
 
@@ -46,6 +47,8 @@ internal sealed class YouTubePage : UserControl
     private Guna2Button _btnExport = null!;
     private Guna2Button _btnClear = null!;
     private Guna2Button _btnPrimary = null!;
+    private Guna2Button _btnBrowser = null!;
+    private readonly ToolTip _browserTip = new();
 
     public YouTubePage(SettingsService settings, HistoryService history)
     {
@@ -122,7 +125,7 @@ internal sealed class YouTubePage : UserControl
     {
         var body = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Background };
 
-        _log = new LogPanel { Dock = DockStyle.Fill };
+        _log = new LogPanel { Dock = DockStyle.Fill, Category = LogCategory.YouTube };
         var logHost = new Panel { Dock = DockStyle.Bottom, Height = 116, Padding = new Padding(20, 0, 20, 16), BackColor = Theme.Background };
         logHost.Controls.Add(_log);
 
@@ -326,7 +329,19 @@ internal sealed class YouTubePage : UserControl
         _btnExport = MakeButton(T("💾  Xuất CSV", "💾  Export CSV"), new Size(140, 32), new Point(ContentWidth - 210 - 8 - 110 - 8 - 140, 12), quiet, Theme.TextSecondary);
         _btnExport.Click += (_, _) => ExportCsv();
 
+        _btnBrowser = MakeButton("👁", new Size(36, 32), new Point(104, 12), ColorTranslator.FromHtml("#1a1a1a"), Theme.TextSecondary);
+        _btnBrowser.Font = new Font("Segoe UI Emoji", 10f);
+        _btnBrowser.Visible = false;
+        _btnBrowser.Click += async (_, _) =>
+        {
+            if (_service is not null)
+            {
+                await _service.SetBrowserVisibleAsync(!_service.BrowserVisible);
+            }
+        };
+
         bar.Controls.Add(_actionInfo);
+        bar.Controls.Add(_btnBrowser);
         bar.Controls.Add(_btnExport);
         bar.Controls.Add(_btnClear);
         bar.Controls.Add(_btnPrimary);
@@ -354,6 +369,13 @@ internal sealed class YouTubePage : UserControl
 
         _btnConnect.Enabled = !_isBusy;
         _btnConnect.Text = _loadedOnce ? T("🔄  Tải lại", "🔄  Reload") : T("🔌  Kết nối", "🔌  Connect");
+        var canHide = _service?.BrowserCanHide ?? false;
+        var shown = _service?.BrowserVisible ?? false;
+        _btnBrowser.Visible = canHide;
+        _btnBrowser.Text = shown ? "🙈" : "👁";
+        _browserTip.SetToolTip(_btnBrowser, shown
+            ? T("Ẩn cửa sổ trình duyệt (vẫn chạy bình thường)", "Hide the browser window (it keeps working)")
+            : T("Hiện cửa sổ trình duyệt", "Show the browser window"));
         _btnSelectInactive.Enabled = !_isBusy && anyInactive;
         _btnSelectShown.Enabled = !_isBusy && hasChannels;
         _btnClear.Enabled = !_isBusy && _channels.Any(c => c.IsSelected);
@@ -370,8 +392,8 @@ internal sealed class YouTubePage : UserControl
             ? T("Đang kết nối và tải danh sách đăng ký…", "Connecting and loading your subscriptions…")
             : _loadedOnce
                 ? T("Không tìm thấy kênh đăng ký nào.", "No subscribed channels found.")
-                : T("Bấm \"Kết nối\": một cửa sổ Chrome riêng sẽ mở, bạn đăng nhập Google một lần.",
-                    "Press \"Connect\": a separate Chrome window opens and you sign in to Google once.");
+                : T("Bấm \"Kết nối\": một cửa sổ trình duyệt riêng sẽ mở, bạn đăng nhập Google một lần.",
+                    "Press \"Connect\": a separate browser window opens and you sign in to Google once.");
 
         _actionInfo.Text = T($"{selectedCount} đã chọn", $"{selectedCount} selected");
     }
@@ -566,18 +588,42 @@ internal sealed class YouTubePage : UserControl
         }
     }
 
-    private Task ConnectAndLoadAsync() => RunBusyAsync(async ct =>
+    /// <summary>Asks the shell to open the Accounts tab on the given platform (set by MainForm) when the user is not signed in.</summary>
+    public Action<string>? RequestLogin { get; set; }
+
+    private Task ConnectAndLoadAsync()
+    {
+        if (BrowserHosts.UseEmbedded(_settings.Current) && !GoogleSession.IsSignedIn())
+        {
+            _log.Log(T("[YouTube] Chưa đăng nhập Google — mở tab Tài khoản để đăng nhập trước.",
+                       "[YouTube] Not signed in to Google — opening the Accounts tab."), LogLevel.Warn);
+            RequestLogin?.Invoke("youtube");
+            return Task.CompletedTask;
+        }
+
+        return ConnectAndLoadCoreAsync();
+    }
+
+    private Task ConnectAndLoadCoreAsync() => RunBusyAsync(async ct =>
     {
         var progress = MakeProgress();
         if (_service is not null && !await _service.IsAliveAsync())
         {
-            progress.Report(T("Cửa sổ Chrome của tool đã đóng — đang kết nối lại...", "The tool's Chrome window was closed — reconnecting..."));
+            progress.Report(T("Cửa sổ trình duyệt của tool đã đóng — đang kết nối lại...", "The tool's browser window was closed — reconnecting..."));
             await _service.DisposeAsync();
             _service = null;
         }
 
-        _service ??= new YouTubeService();
-        progress.Report(T("Đang mở Chrome riêng...", "Opening the separate Chrome window..."));
+        _service ??= new YouTubeService(BrowserHosts.UseEmbedded(_settings.Current), _settings.Current.RunBrowserHidden)
+        {
+            ChallengeCooldownSeconds = _settings.Current.RateLimitWaitSeconds,
+        };
+        _service.ChallengeNotice += text => _log.Log(text, LogLevel.Warn);
+        _service.BrowserStateChanged += () =>
+        {
+            if (InvokeRequired) BeginInvoke(UpdateButtonStates); else UpdateButtonStates();
+        };
+        progress.Report(T("Đang mở trình duyệt riêng...", "Opening the separate browser window..."));
         await _service.ConnectAsync(progress, ct);
 
         var list = await _service.LoadSubscriptionsAsync(progress, ct);
@@ -775,8 +821,8 @@ internal sealed class YouTubePage : UserControl
 
         if (_service is null || !await _service.IsAliveAsync())
         {
-            _log.Log(T("[YouTube] Chưa kết nối, hoặc cửa sổ Chrome của tool đã đóng — bấm \"Kết nối\" / \"Tải lại\" trước.",
-                       "[YouTube] Not connected, or the tool's Chrome window was closed — press \"Connect\" / \"Reload\" first."), LogLevel.Warn);
+            _log.Log(T("[YouTube] Chưa kết nối, hoặc cửa sổ trình duyệt của tool đã đóng — bấm \"Kết nối\" / \"Tải lại\" trước.",
+                       "[YouTube] Not connected, or the tool's browser window was closed — press \"Connect\" / \"Reload\" first."), LogLevel.Warn);
             return;
         }
 

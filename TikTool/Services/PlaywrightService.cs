@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text.Json;
 using Microsoft.Playwright;
+using TikTool.Browser;
 using TikTool.Models;
 
 namespace TikTool.Services;
@@ -24,49 +25,78 @@ namespace TikTool.Services;
 public sealed class PlaywrightService : IAsyncDisposable
 {
     private IPlaywright? _playwright;
-    private IBrowser? _browser;
     private IBrowserContext? _context;
     private IPage? _page;
-    private Process? _chromeProcess;
+    private IBrowserHost? _host;
+    private IPage? _workerPage;
+    private readonly SemaphoreSlim _workerGate = new(1, 1);
+    private ChallengeGate? _gate;
     private string? _profileDir;
 
-    public bool IsLaunched => _page is not null;
+    /// <summary>True while the browser is up. A closed window counts as not launched, so the next run starts a fresh one.</summary>
+    public bool IsLaunched => _page is not null && _host is { IsRunning: true };
 
-    public async Task LaunchAsync(TikTokCookie cookie, bool headless = false)
+    /// <summary>Raised when the browser starts, stops, or its window is shown or hidden (may come from any thread).</summary>
+    public event Action? BrowserStateChanged;
+
+    /// <summary>Seconds to wait after a captcha is solved before the work goes on (the pages set it from the rate-limit wait).</summary>
+    public int ChallengeCooldownSeconds { get; set; } = 90;
+
+    /// <summary>User-facing lines about a captcha (waiting, reminders, solved).</summary>
+    public event Action<string>? ChallengeNotice;
+
+    /// <summary>The work window can be hidden (built-in browser only).</summary>
+    public bool BrowserCanHide => _host is { CanHide: true };
+
+    public bool BrowserVisible => _host?.IsVisible ?? false;
+
+    public async Task SetBrowserVisibleAsync(bool visible)
+    {
+        if (_host is null)
+        {
+            return;
+        }
+
+        await _host.SetVisibleAsync(visible, CancellationToken.None);
+        BrowserStateChanged?.Invoke();
+    }
+
+    /// <param name="embedded">true = the built-in WebView2 window (its profile folder is shared with the Accounts tab), false = the installed Chrome/Edge with a throwaway profile.</param>
+    public async Task LaunchAsync(TikTokCookie cookie, bool embedded = false, bool startHidden = false)
     {
         TryFlushDnsCache();
 
-        var chromePath = FindRealChromeExecutable();
-        _playwright = await Playwright.CreateAsync();
-
-        if (chromePath is not null)
+        string profile;
+        if (embedded)
         {
-            // CDP-attach to real Chrome/Edge — the only mode confirmed to work against TikTok.
-            var port = GetFreeTcpPort();
-            _profileDir = Path.Combine(Path.GetTempPath(), $"tiktool_chrome_session_{Guid.NewGuid():N}");
-            Directory.CreateDirectory(_profileDir);
-
-            var headlessArg = headless ? "--headless=new " : "";
-            _chromeProcess = Process.Start(new ProcessStartInfo
-            {
-                FileName = chromePath,
-                Arguments = $"{headlessArg}--remote-debugging-port={port} --user-data-dir=\"{_profileDir}\" --no-first-run --no-default-browser-check --window-size=1440,900 about:blank",
-                UseShellExecute = false,
-            }) ?? throw new InvalidOperationException(T("Không khởi chạy được Chrome/Edge.", "Could not start Chrome/Edge."));
-
-            _browser = await ConnectWithRetryAsync(_playwright, port, CancellationToken.None);
-            _context = _browser.Contexts.FirstOrDefault() ?? await _browser.NewContextAsync();
+            profile = AppPaths.TikTokWebViewDir;
         }
         else
         {
-            throw new InvalidOperationException(
-                T("Không tìm thấy Google Chrome hoặc Microsoft Edge trên máy.\n", "Google Chrome or Microsoft Edge was not found on this computer.\n") +
-                T("Social Toolkit cần attach vào Chrome/Edge thật (TikTok chặn trình duyệt tự động).\n", "Social Toolkit needs to attach to a real Chrome/Edge (TikTok blocks automated browsers).\n") +
-                T("Hãy cài Google Chrome: https://www.google.com/chrome/", "Please install Google Chrome: https://www.google.com/chrome/"));
+            if (FindRealChromeExecutable() is null)
+            {
+                throw new InvalidOperationException(
+                    T("Không tìm thấy Google Chrome hoặc Microsoft Edge trên máy.\n", "Google Chrome or Microsoft Edge was not found on this computer.\n") +
+                    T("Social Toolkit cần attach vào Chrome/Edge thật (TikTok chặn trình duyệt tự động).\n", "Social Toolkit needs to attach to a real Chrome/Edge (TikTok blocks automated browsers).\n") +
+                    T("Hãy cài Google Chrome: https://www.google.com/chrome/", "Please install Google Chrome: https://www.google.com/chrome/"));
+            }
+
+            _profileDir = Path.Combine(Path.GetTempPath(), $"tiktool_chrome_session_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(_profileDir);
+            profile = _profileDir;
         }
 
+        _playwright = await Playwright.CreateAsync();
+        _host = BrowserHosts.Create(embedded, startHidden);
+        _context = await _host.StartAsync(_playwright, profile, T("Social Toolkit — Trình duyệt TikTok", "Social Toolkit — TikTok browser"), CancellationToken.None);
         await _context.AddCookiesAsync(BuildCookies(cookie));
-        _page = _context.Pages.FirstOrDefault() ?? await _context.NewPageAsync();
+        _page = await _host.GetMainPageAsync(CancellationToken.None);
+        _gate = new ChallengeGate("TikTok", _host, () => new[] { _page, _workerPage }.Where(p => p is not null).Select(p => p!).ToList())
+        {
+            CooldownSeconds = () => ChallengeCooldownSeconds,
+        };
+        _gate.Notice += text => ChallengeNotice?.Invoke(text);
+        BrowserStateChanged?.Invoke();
 
         // Warm-up: this profile dir is brand new every launch (only cookies were injected, no
         // localStorage/device fingerprint), and navigating straight to a deep page like a profile
@@ -218,7 +248,7 @@ public sealed class PlaywrightService : IAsyncDisposable
         var chromePath = FindRealChromeExecutable()
             ?? throw new InvalidOperationException(
                 T("Không tìm thấy Google Chrome hoặc Microsoft Edge trên máy. ", "Google Chrome or Microsoft Edge was not found on this computer. ") +
-                T("Hãy cài Chrome/Edge hoặc dùng cách 'Dán cookie thủ công' thay thế.", "Install Chrome/Edge or use the 'Paste cookie manually' method instead."));
+                T("Hãy cài Chrome/Edge hoặc cài WebView2 Runtime.", "Install Chrome/Edge or the WebView2 runtime."));
 
         var port = GetFreeTcpPort();
         var profileDir = Path.Combine(Path.GetTempPath(), $"tiktool_chrome_login_{Guid.NewGuid():N}");
@@ -420,7 +450,7 @@ public sealed class PlaywrightService : IAsyncDisposable
             }
             catch (Exception ex) when (ct.IsCancellationRequested == false)
             {
-                AppLog.Write("WARN", $"Open Following panel attempt {attempt + 1} failed: {ex.GetType().Name}: {ex.Message}");
+                AppLog.Write("WARN", $"Open Following panel attempt {attempt + 1} failed: {ex.GetType().Name}: {ex.Message}", LogCategory.TikTok);
                 if (attempt < 2)
                 {
                     log?.Report(T($"[Unfollow] Chưa mở được danh sách Following ({ex.Message}), thử lại (lần {attempt + 2})...",
@@ -463,6 +493,13 @@ public sealed class PlaywrightService : IAsyncDisposable
         while (noChangeCount < 35 && stopwatch.Elapsed < overallBudget)
         {
             ct.ThrowIfCancellationRequested();
+
+            // A captcha stops the loading until it is solved; the waiting must not eat the time budget.
+            if (_gate is not null && await _gate.CheckpointAsync(T("tải danh sách đang theo dõi", "loading the following list"), ct))
+            {
+                noChangeCount = 0;
+                stopwatch.Restart();
+            }
 
             var scan = await ScanFollowingModalAsync(page, username, selectors.FollowingItem);
             var count = scan.Rows.Count;
@@ -961,8 +998,16 @@ public sealed class PlaywrightService : IAsyncDisposable
     /// this now reads the button's aria-label BEFORE and AFTER clicking (TikTok renders it as
     /// "Following {name}" vs "Follow {name}") and only reports success if it actually flipped;
     /// on failure it saves a debug dump instead of silently lying about the result.</summary>
-    public async Task<bool> ClickUnfollowAsync(
+    public Task<bool> ClickUnfollowAsync(
         string username, SelectorsConfig selectors, string userId = "", CancellationToken ct = default)
+    {
+        // Safe to run again after a captcha: it reads the button state first and reports "done" when the account is no longer followed.
+        Task<bool> Step() => ClickUnfollowCoreAsync(username, selectors, userId, ct);
+        return _gate is null ? Step() : _gate.RunStepAsync(Step, T($"bỏ theo dõi @{username}", $"unfollowing @{username}"), ct);
+    }
+
+    private async Task<bool> ClickUnfollowCoreAsync(
+        string username, SelectorsConfig selectors, string userId, CancellationToken ct)
     {
         EnsureLaunched();
         var page = _page!;
@@ -1202,14 +1247,43 @@ public sealed class PlaywrightService : IAsyncDisposable
     {
         JsonDocument? hydrationDoc = null;
         JsonDocument? apiDoc = null;
+        EventHandler<IResponse>? onItemResponse = null;
         try
         {
-            var itemListTask = page.WaitForResponseAsync(
-                r => r.Url.Contains("/api/post/item_list/") && r.Ok,
-                new PageWaitForResponseOptions { Timeout = 15_000 });
-            // Observe any fault (e.g. page closed on an early return) so it is not reported later as an
-            // unobserved task exception.
-            _ = itemListTask.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
+            // Read the item_list body the moment its response arrives. Read later (after the page data), the browser may
+            // already have dropped it: Network.getResponseBody then fails with "No resource with given identifier found"
+            // (seen in the built-in browser, 3 of 9 profiles). A fault is observed so it is not reported as unobserved.
+            var itemBody = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            _ = itemBody.Task.ContinueWith(t => { _ = t.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
+            onItemResponse = (_, response) =>
+            {
+                if (!response.Url.Contains("/api/post/item_list/") || !response.Ok)
+                {
+                    return;
+                }
+
+                _ = Task.Run(async () =>
+                {
+                    for (var attempt = 0; attempt < 2; attempt++)
+                    {
+                        try
+                        {
+                            itemBody.TrySetResult(await response.TextAsync());
+                            return;
+                        }
+                        catch (Exception) when (attempt == 0)
+                        {
+                            await Task.Delay(300);
+                        }
+                        catch (Exception ex)
+                        {
+                            itemBody.TrySetException(ex);
+                            return;
+                        }
+                    }
+                });
+            };
+            page.Response += onItemResponse;
 
             // The page's own user/detail request (it carries a valid signature) is a second source for the
             // same data, used when the embedded page data is missing.
@@ -1295,8 +1369,7 @@ public sealed class PlaywrightService : IAsyncDisposable
             {
                 try
                 {
-                    var response = await itemListTask;
-                    var body = await response.TextAsync();
+                    var body = await itemBody.Task.WaitAsync(TimeSpan.FromSeconds(15), ct);
                     if (string.IsNullOrWhiteSpace(body))
                     {
                         // HTTP 200 with no content: TikTok's usual way of refusing a request it considers automated /
@@ -1336,7 +1409,6 @@ public sealed class PlaywrightService : IAsyncDisposable
             else
             {
                 BumpDetailStat("no_videos");
-                _ = itemListTask.ContinueWith(_ => { }, TaskContinuationOptions.None);
             }
 
             return (userId, videoCount, lastPostUnixSeconds, relation);
@@ -1352,6 +1424,11 @@ public sealed class PlaywrightService : IAsyncDisposable
         }
         finally
         {
+            if (onItemResponse is not null)
+            {
+                page.Response -= onItemResponse;
+            }
+
             hydrationDoc?.Dispose();
             apiDoc?.Dispose();
         }
@@ -1392,10 +1469,32 @@ public sealed class PlaywrightService : IAsyncDisposable
     /// <paramref name="username"/> via <see cref="GetUserDetailOnPageAsync"/>, then closes the
     /// page. Safe to call concurrently from multiple tasks as long as the browser context is
     /// still open. Returns null on any failure so callers never need to catch.</summary>
-    public async Task<(string UserId, int VideoCount, long? LastPostUnixSeconds, int Relation)?> GetUserDetailParallelAsync(
+    public Task<(string UserId, int VideoCount, long? LastPostUnixSeconds, int Relation)?> GetUserDetailParallelAsync(
         string username, CancellationToken ct = default)
     {
+        Task<(string UserId, int VideoCount, long? LastPostUnixSeconds, int Relation)?> Step() => GetUserDetailParallelCoreAsync(username, ct);
+        return _gate is null ? Step() : _gate.RunStepAsync(Step, T($"đọc hồ sơ @{username}", $"reading the profile of @{username}"), ct);
+    }
+
+    private async Task<(string UserId, int VideoCount, long? LastPostUnixSeconds, int Relation)?> GetUserDetailParallelCoreAsync(
+        string username, CancellationToken ct)
+    {
         EnsureLaunched();
+        if (_host is { WorkerRunsOneAtATime: true })
+        {
+            // The built-in browser has one hidden reading page: use it for one profile at a time.
+            await _workerGate.WaitAsync(ct);
+            try
+            {
+                _workerPage ??= await _host.NewWorkerPageAsync(ct);
+                return await GetUserDetailOnPageAsync(_workerPage, username, ct);
+            }
+            finally
+            {
+                _workerGate.Release();
+            }
+        }
+
         var page = await _context!.NewPageAsync();
         try
         {
@@ -1437,23 +1536,19 @@ public sealed class PlaywrightService : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (_context is not null)
+        try
         {
-            await _context.CloseAsync();
+            if (_host is not null)
+            {
+                await _host.DisposeAsync();
+            }
         }
-
-        if (_browser is not null)
+        catch
         {
-            await _browser.CloseAsync();
+            // best effort
         }
 
         _playwright?.Dispose();
-
-        if (_chromeProcess is not null)
-        {
-            TryKillChrome(_chromeProcess);
-            _chromeProcess.Dispose();
-        }
 
         if (_profileDir is not null)
         {
@@ -1461,10 +1556,11 @@ public sealed class PlaywrightService : IAsyncDisposable
         }
 
         _context = null;
-        _browser = null;
         _page = null;
+        _workerPage = null;
+        _gate = null;
         _playwright = null;
-        _chromeProcess = null;
+        _host = null;
         _profileDir = null;
-    }
-}
+        BrowserStateChanged?.Invoke();
+    }}

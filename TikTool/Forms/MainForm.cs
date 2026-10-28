@@ -49,7 +49,7 @@ public sealed class MainForm : Form
         Font = Theme.FontRegular;
 
         // Tất cả service tạo 1 lần ở đây rồi inject vào các page qua constructor — mỗi page
-        // không tự new() service của mình, để CookiePage/UnfollowPage cùng chia sẻ đúng 1
+        // không tự new() service của mình, để AccountsPage/UnfollowPage cùng chia sẻ đúng 1
         // CookieService, và SettingsPage/HistoryPage thao tác trên cùng dữ liệu mà
         // UnfollowPage/DownloadPage đọc/ghi.
         var settingsService = new SettingsService();
@@ -77,12 +77,15 @@ public sealed class MainForm : Form
         Controls.Add(sidebar);
 
         RegisterPage("download", new DownloadPage(ytDlpService, historyService, settingsService, cookieService));
-        RegisterPage(TikTokUnfollowKey, new UnfollowPage(playwrightService, tikTokApiService, cookieService, settingsService, historyService, sessionStateService));
+        var unfollowPage = new UnfollowPage(playwrightService, tikTokApiService, cookieService, settingsService, historyService, sessionStateService);
+        unfollowPage.RequestLogin = OpenAccounts;
+        RegisterPage(TikTokUnfollowKey, unfollowPage);
         _youTubePage = new YouTubePage(settingsService, historyService);
+        _youTubePage.RequestLogin = OpenAccounts;
         RegisterPage(YouTubeUnsubKey, _youTubePage);
-        var cookiePage = new CookiePage(cookieService, playwrightService);
-        cookiePage.CookieStatusChanged += () => _ = RefreshFooterAsync();
-        RegisterPage("cookie", cookiePage);
+        var accountsPage = new AccountsPage(cookieService, playwrightService, settingsService);
+        accountsPage.CookieStatusChanged += () => _ = RefreshFooterAsync();
+        RegisterPage("accounts", accountsPage);
         RegisterPage("settings", new SettingsPage(settingsService));
         RegisterPage("history", new HistoryPage(historyService));
         RegisterPage("guide", new GuidePage());
@@ -133,7 +136,7 @@ public sealed class MainForm : Form
         _trayIcon.DoubleClick += (_, _) => RestoreFromTray();
     }
 
-    private static Icon LoadAppIcon()
+    internal static Icon LoadAppIcon()
     {
         try
         {
@@ -145,6 +148,31 @@ public sealed class MainForm : Form
         }
     }
 
+    /// <summary>Something needs the user (a captcha): a sound, the taskbar button flashes until the app is in front, and a balloon when the app sits in the tray.</summary>
+    public void ShowAlert(string title, string text)
+    {
+        System.Media.SystemSounds.Exclamation.Play();
+        var info = new FlashInfo { Size = (uint)System.Runtime.InteropServices.Marshal.SizeOf<FlashInfo>(), Window = Handle, Flags = 0x3 | 0xC, Count = uint.MaxValue, Timeout = 0 };
+        FlashWindowEx(ref info);
+        if (_trayIcon is { Visible: true })
+        {
+            _trayIcon.ShowBalloonTip(8000, title, text, ToolTipIcon.Warning);
+        }
+    }
+
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct FlashInfo
+    {
+        public uint Size;
+        public IntPtr Window;
+        public uint Flags;
+        public uint Count;
+        public uint Timeout;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool FlashWindowEx(ref FlashInfo info);
+
     /// <summary>Called when the user starts a second copy of the app: show this window instead of opening another one.</summary>
     public void BringToFrontFromAnotherInstance()
     {
@@ -152,6 +180,16 @@ public sealed class MainForm : Form
         TopMost = true;
         TopMost = false;
         Activate();
+    }
+
+    /// <summary>Called by a feature page that needs the user to sign in first.</summary>
+    public void OpenAccounts(string platform)
+    {
+        NavigateTo("accounts");
+        if (_pages.TryGetValue("accounts", out var page) && page is AccountsPage accounts)
+        {
+            accounts.ShowPlatform(platform);
+        }
     }
 
     private void OpenFromTray(string pageKey)
@@ -211,9 +249,9 @@ public sealed class MainForm : Form
         flow.Controls.Add(BuildLogo());
         flow.Controls.Add(BuildSectionLabel(T("CHỨC NĂNG", "FEATURES")));
         flow.Controls.Add(CreateNavItem("download", "📥", "Download"));
+        flow.Controls.Add(CreateNavItem("accounts", "👤", T("Tài khoản", "Accounts")));
         BuildUnfollowGroup(flow);
         flow.Controls.Add(BuildSectionLabel(T("HỆ THỐNG", "SYSTEM")));
-        flow.Controls.Add(CreateNavItem("cookie", "🍪", "Cookie"));
         flow.Controls.Add(CreateNavItem("settings", "🔧", T("Cài đặt", "Settings")));
         flow.Controls.Add(CreateNavItem("history", "📋", T("Lịch sử", "History")));
         flow.Controls.Add(CreateNavItem("guide", "📖", T("Hướng dẫn", "Guide")));

@@ -1,10 +1,26 @@
 namespace TikTool.Services;
 
-/// <summary>Per-session log file: every run writes to its OWN new file (never renamed or overwritten,
-/// which security software has been seen silently blocking), so the log of the latest run can always
-/// be read back. Only the newest 15 sessions are kept.</summary>
+/// <summary>Besides the per-session file, a line can also go to one persistent file per kind of event, so one place answers
+/// "what happened with TikTok / YouTube / captchas / updates / downloads / tool errors" across many runs.</summary>
+public enum LogCategory
+{
+    None,
+    TikTok,
+    YouTube,
+    Challenges,
+    Update,
+    Download,
+    Errors,
+}
+
+/// <summary>Per-session log file: every run writes to its OWN new file (never renamed or overwritten), so the log of the latest run can always
+/// be read back. Only the newest 15 sessions are kept. On top of that, lines tagged with a <see cref="LogCategory"/> are appended to a
+/// persistent file (tiktok.log, youtube.log, challenges.log, update.log, download.log, errors.log; one rotation at 1 MB), and every ERROR or
+/// FATAL line from anywhere also lands in errors.log. The persistent files carry the full date because they span many days.</summary>
 internal static class AppLog
 {
+    private const long MaxCategoryBytes = 1_000_000;
+
     private static readonly object Gate = new();
     private static string? _file;
 
@@ -32,19 +48,58 @@ internal static class AppLog
         }
     }
 
-    public static void Write(string level, string text)
+    public static string CategoryPath(LogCategory category) => Path.Combine(AppPaths.LogDir, category switch
     {
-        var file = _file;
-        if (file is null)
-        {
-            return;
-        }
+        LogCategory.TikTok => "tiktok.log",
+        LogCategory.YouTube => "youtube.log",
+        LogCategory.Challenges => "challenges.log",
+        LogCategory.Update => "update.log",
+        LogCategory.Download => "download.log",
+        _ => "errors.log",
+    });
 
-        var line = $"{DateTime.Now:HH:mm:ss.fff} [{level}] {text}{Environment.NewLine}";
+    public static void Write(string level, string text) => Write(level, text, LogCategory.None);
+
+    public static void Write(string level, string text, LogCategory category)
+    {
+        var now = DateTime.Now;
         lock (Gate)
         {
-            try { File.AppendAllText(file, line); }
-            catch (Exception ex) { LastWriteError = ex.Message; }
+            if (_file is not null)
+            {
+                try { File.AppendAllText(_file, $"{now:HH:mm:ss.fff} [{level}] {text}{Environment.NewLine}"); }
+                catch (Exception ex) { LastWriteError = ex.Message; }
+            }
+
+            var full = $"{now:yyyy-MM-dd HH:mm:ss.fff} [{level}] {text}{Environment.NewLine}";
+            if (category != LogCategory.None)
+            {
+                AppendTo(category, full);
+            }
+
+            if (category != LogCategory.Errors && level is "ERROR" or "FATAL")
+            {
+                AppendTo(LogCategory.Errors, full);
+            }
+        }
+    }
+
+    private static void AppendTo(LogCategory category, string line)
+    {
+        try
+        {
+            var path = CategoryPath(category);
+            var info = new FileInfo(path);
+            if (info.Exists && info.Length > MaxCategoryBytes)
+            {
+                File.Move(path, path + ".1", overwrite: true);
+            }
+
+            File.AppendAllText(path, line);
+        }
+        catch (Exception ex)
+        {
+            LastWriteError = ex.Message;
         }
     }
 }

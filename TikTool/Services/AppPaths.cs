@@ -61,6 +61,28 @@ internal static class AppPaths
         }
     }
 
+    /// <summary>User-data folder of the built-in (WebView2) browser for YouTube; kept apart from the Chrome profile because the two engines lay out their folders differently.</summary>
+    public static string YouTubeWebViewDir
+    {
+        get
+        {
+            var dir = Path.Combine(AppDataDir, "youtube_webview");
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+    }
+
+    /// <summary>User-data folder of the TikTok sign-in browser (WebView2). The session cookies themselves are kept in the tool's own cookie file.</summary>
+    public static string TikTokWebViewDir
+    {
+        get
+        {
+            var dir = Path.Combine(AppDataDir, "tiktok_webview");
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+    }
+
     public static string SessionFile => Path.Combine(AppDataDir, "session_resume.dat");
     public static string WhitelistFile => Path.Combine(AppDataDir, "whitelist.dat");
 

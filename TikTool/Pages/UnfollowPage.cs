@@ -1,5 +1,6 @@
 using Guna.UI2.WinForms;
 using TikTool.Forms;
+using TikTool.Browser;
 using TikTool.Models;
 using TikTool.Services;
 
@@ -15,6 +16,9 @@ internal sealed class UnfollowPage : UserControl
     private readonly SettingsService _settingsService;
     private readonly HistoryService _historyService;
     private readonly SessionStateService _sessionStateService;
+
+    /// <summary>Asks the shell to open the Accounts tab (set by MainForm) when TikTok is not signed in.</summary>
+    public Action<string>? RequestLogin { get; set; }
 
     private readonly List<FollowingAccount> _accounts = new();
     private readonly Dictionary<FollowingAccount, FollowingItemControl> _rows = new();
@@ -42,6 +46,8 @@ internal sealed class UnfollowPage : UserControl
     private System.Windows.Forms.Timer _searchTimer = null!;
     private Guna2Button _btnSelectShown = null!;
     private Guna2Button _btnCheckDates = null!;
+    private Guna2Button _btnBrowser = null!;
+    private readonly ToolTip _browserTip = new();
     private readonly LastPostCache _dateCache = new();
 
     public UnfollowPage(
@@ -53,6 +59,8 @@ internal sealed class UnfollowPage : UserControl
         SessionStateService sessionStateService)
     {
         _playwright = playwright;
+        _playwright.BrowserStateChanged += UpdateButtonStates;
+        _playwright.ChallengeNotice += text => _log.Log(text, LogLevel.Warn);
         _apiService = apiService;
         _cookieService = cookieService;
         _settingsService = settingsService;
@@ -105,6 +113,11 @@ internal sealed class UnfollowPage : UserControl
                 ? T($"📅  Kiểm tra ngày ({needDates})", $"📅  Check dates ({needDates})")
                 : T("📅  Đã đủ ngày đăng", "📅  All dates known");
             _btnClearSelection.Enabled = !_isBusy && anySelected;
+            _btnBrowser.Visible = _playwright.BrowserCanHide;
+            _btnBrowser.Text = _playwright.BrowserVisible ? "🙈" : "👁";
+            _browserTip.SetToolTip(_btnBrowser, _playwright.BrowserVisible
+                ? T("Ẩn cửa sổ trình duyệt (vẫn chạy bình thường)", "Hide the browser window (it keeps working)")
+                : T("Hiện cửa sổ trình duyệt", "Show the browser window"));
             _btnStart.Enabled = _isBusy || selectedCount > 0;
             _btnStart.Text = _isBusy
                 ? T("⏹  Dừng", "⏹  Stop")
@@ -151,7 +164,7 @@ internal sealed class UnfollowPage : UserControl
 
         _headerBadge = new Label
         {
-            Text = T("Cần cookie", "Cookie needed"),
+            Text = T("Cần đăng nhập", "Sign-in needed"),
             Font = Theme.FontLabel,
             AutoSize = true,
             Padding = new Padding(8, 4, 8, 4),
@@ -180,7 +193,7 @@ internal sealed class UnfollowPage : UserControl
     {
         var body = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Background };
 
-        _log = new LogPanel { Dock = DockStyle.Fill };
+        _log = new LogPanel { Dock = DockStyle.Fill, Category = LogCategory.TikTok };
         var logHost = new Panel { Dock = DockStyle.Bottom, Height = 116, Padding = new Padding(20, 0, 20, 16), BackColor = Theme.Background };
         logHost.Controls.Add(_log);
 
@@ -352,7 +365,9 @@ internal sealed class UnfollowPage : UserControl
             Text = T("Chưa tải danh sách theo dõi", "Following list not loaded"),
             Font = Theme.FontLabel,
             ForeColor = ColorTranslator.FromHtml("#444444"),
-            AutoSize = true,
+            AutoSize = false,
+            AutoEllipsis = true,
+            Size = new Size(Math.Max(120, ContentWidth - 100 - 8 - 205 - 8 - 215 - 12), 18),
             Location = new Point(0, 6),
         };
 
@@ -481,7 +496,22 @@ internal sealed class UnfollowPage : UserControl
         };
         _btnCheckDates.Click += async (_, _) => await CheckLastPostDatesAsync();
 
+        _btnBrowser = new Guna2Button
+        {
+            Text = "👁",
+            Font = new Font("Segoe UI Emoji", 10f),
+            Size = new Size(36, 32),
+            Location = new Point(104, 12),
+            FillColor = ColorTranslator.FromHtml("#1a1a1a"),
+            ForeColor = Theme.TextSecondary,
+            BorderRadius = 7,
+            Cursor = Cursors.Hand,
+            Visible = false,
+        };
+        _btnBrowser.Click += async (_, _) => await _playwright.SetBrowserVisibleAsync(!_playwright.BrowserVisible);
+
         bar.Controls.Add(_actionInfo);
+        bar.Controls.Add(_btnBrowser);
         bar.Controls.Add(_btnClearSelection);
         bar.Controls.Add(_btnCheckDates);
         bar.Controls.Add(_btnStart);
@@ -500,8 +530,9 @@ internal sealed class UnfollowPage : UserControl
         var cookie = await _cookieService.LoadCookieAsync();
         if (cookie is null || string.IsNullOrEmpty(cookie.Username))
         {
-            _log.Log(T("[Unfollow] Chưa có cookie đã xác thực — sang tab Cookie để đăng nhập trước.",
-                        "[Unfollow] No authenticated cookie — go to Cookie tab to sign in first."), LogLevel.Warn);
+            _log.Log(T("[Unfollow] Chưa đăng nhập TikTok — mở tab Tài khoản để đăng nhập trước.",
+                        "[Unfollow] Not signed in to TikTok — opening the Accounts tab."), LogLevel.Warn);
+            RequestLogin?.Invoke("tiktok");
             return;
         }
 
@@ -544,8 +575,8 @@ internal sealed class UnfollowPage : UserControl
         UpdateButtonStates();
         _cts = new CancellationTokenSource();
         var reloadCt = _cts.Token;
-        _log.Log(T("[Playwright] Đang mở Chrome thật (sẽ hiện cửa sổ) và inject cookie...",
-                    "[Playwright] Opening real Chrome (a window will appear) and injecting cookie..."), LogLevel.Info);
+        _log.Log(T("[Playwright] Đang mở trình duyệt (sẽ hiện cửa sổ) và nạp cookie...",
+                    "[Playwright] Opening the browser (a window will appear) and loading the cookie..."), LogLevel.Info);
 
         try
         {
@@ -622,21 +653,24 @@ internal sealed class UnfollowPage : UserControl
     {
         await _playwright.DisposeAsync();
         await EnsureChromeAsync();
-        await _playwright.LaunchAsync(cookie);
+        _playwright.ChallengeCooldownSeconds = _settingsService.Current.RateLimitWaitSeconds;
+        await _playwright.LaunchAsync(cookie, BrowserHosts.UseEmbedded(_settingsService.Current), _settingsService.Current.RunBrowserHidden);
     }
 
     private async Task EnsurePlaywrightAsync(TikTokCookie cookie)
     {
         if (_playwright.IsLaunched) return;
+        await _playwright.DisposeAsync();
         await EnsureChromeAsync();
-        await _playwright.LaunchAsync(cookie);
+        _playwright.ChallengeCooldownSeconds = _settingsService.Current.RateLimitWaitSeconds;
+        await _playwright.LaunchAsync(cookie, BrowserHosts.UseEmbedded(_settingsService.Current), _settingsService.Current.RunBrowserHidden);
     }
 
     /// <summary>Ensures Chrome/Edge is installed — downloads and installs silently if not found.
     /// Shows download progress in the log panel. Throws if user cancels or install fails.</summary>
     private async Task EnsureChromeAsync()
     {
-        if (PlaywrightService.FindRealChromeExecutable() is not null) return;
+        if (BrowserHosts.UseEmbedded(_settingsService.Current) || PlaywrightService.FindRealChromeExecutable() is not null) return;
 
         _log.Log(T("Đang tải Chrome offline installer (~80 MB)...",
                    "Downloading Chrome offline installer (~80 MB)..."), LogLevel.Info);
@@ -733,8 +767,8 @@ internal sealed class UnfollowPage : UserControl
                     if (!alive)
                     {
                         throw new InvalidOperationException(T(
-                            "[Unfollow] Cookie hết hạn trong khi đang scan — vào tab Cookie để làm mới rồi thử lại.",
-                            "[Unfollow] Cookie expired during scan — go to Cookie tab to refresh and try again."));
+                            "[Unfollow] Cookie hết hạn trong khi đang scan — vào tab Tài khoản để đăng nhập lại rồi thử lại.",
+                            "[Unfollow] Cookie expired during scan — go to the Accounts tab to sign in again and retry."));
                     }
                 }
             }
@@ -782,7 +816,7 @@ internal sealed class UnfollowPage : UserControl
         var cookie = await _cookieService.LoadCookieAsync();
         if (cookie is null)
         {
-            _log.Log(T("[Unfollow] Không tìm thấy cookie — sang tab Cookie trước.", "[Unfollow] Cookie not found — go to Cookie tab first."), LogLevel.Error);
+            _log.Log(T("[Unfollow] Chưa đăng nhập TikTok — sang tab Tài khoản trước.", "[Unfollow] Not signed in to TikTok — go to the Accounts tab first."), LogLevel.Error);
             return;
         }
 
@@ -1189,7 +1223,7 @@ internal sealed class UnfollowPage : UserControl
         var cookie = await _cookieService.LoadCookieAsync();
         if (cookie is null)
         {
-            _log.Log(T("[Unfollow] Không tìm thấy cookie — sang tab Cookie trước.", "[Unfollow] Cookie not found — go to Cookie tab first."), LogLevel.Error);
+            _log.Log(T("[Unfollow] Chưa đăng nhập TikTok — sang tab Tài khoản trước.", "[Unfollow] Not signed in to TikTok — go to the Accounts tab first."), LogLevel.Error);
             return;
         }
 
@@ -1381,7 +1415,7 @@ internal sealed class UnfollowPage : UserControl
     private void UpdateHeaderBadge()
     {
         var dead = _accounts.Count(a => a.IsDead);
-        _headerBadge.Text = _accounts.Count == 0 ? T("Cần cookie", "Cookie needed") : T($"{dead} không hoạt động / {_accounts.Count}", $"{dead} inactive / {_accounts.Count}");
+        _headerBadge.Text = _accounts.Count == 0 ? T("Cần đăng nhập", "Sign-in needed") : T($"{dead} không hoạt động / {_accounts.Count}", $"{dead} inactive / {_accounts.Count}");
         _headerBadge.ForeColor = dead > 0 ? Theme.Orange : Theme.TextMuted;
     }
 }

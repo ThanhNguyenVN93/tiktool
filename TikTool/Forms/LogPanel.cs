@@ -15,6 +15,9 @@ public sealed class LogPanel : Panel
 {
     private readonly FlowLayoutPanel _flow;
 
+    /// <summary>The persistent log file this panel's lines also go to (set by the page that owns it).</summary>
+    public LogCategory Category { get; set; } = LogCategory.None;
+
     public LogPanel()
     {
         BackColor = ColorTranslator.FromHtml("#0a0a0a");
@@ -42,7 +45,7 @@ public sealed class LogPanel : Panel
             return;
         }
 
-        AppLog.Write(level.ToString().ToUpperInvariant(), text);
+        AppLog.Write(level.ToString().ToUpperInvariant(), text, Category);
 
         void Append()
         {

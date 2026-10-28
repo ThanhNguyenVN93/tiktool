@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
+using TikTool.Browser;
 using TikTool.Models;
 
 namespace TikTool.Services;
@@ -18,12 +19,45 @@ internal sealed class YouTubeService : IAsyncDisposable
     private const string FeedUrl = "https://www.youtube.com/feed/channels?hl=en";
     private const string SignInUrl = "https://accounts.google.com/ServiceLogin?service=youtube&hl=en&continue=https%3A%2F%2Fwww.youtube.com%2Ffeed%2Fchannels%3Fhl%3Den";
 
-    private Process? _chrome;
+    private IBrowserHost? _host;
+    private readonly bool _embedded;
+    private readonly bool _startHidden;
+    private ChallengeGate? _gate;
     private IPlaywright? _playwright;
-    private IBrowser? _browser;
     private IBrowserContext? _context;
     private IPage? _feedPage;
     private IPage? _agePage;
+
+    /// <param name="useEmbeddedBrowser">true = the built-in WebView2 window, false = the installed Chrome/Edge as a separate window.</param>
+    public YouTubeService(bool useEmbeddedBrowser = false, bool startHidden = false)
+    {
+        _embedded = useEmbeddedBrowser;
+        _startHidden = startHidden;
+    }
+
+    /// <summary>Seconds to wait after a captcha is solved before the work goes on (the page sets it from the rate-limit wait).</summary>
+    public int ChallengeCooldownSeconds { get; set; } = 90;
+
+    /// <summary>User-facing lines about a verification (waiting, reminders, solved).</summary>
+    public event Action<string>? ChallengeNotice;
+
+    /// <summary>Raised when the browser window is shown or hidden.</summary>
+    public event Action? BrowserStateChanged;
+
+    public bool BrowserCanHide => _host is { CanHide: true };
+
+    public bool BrowserVisible => _host?.IsVisible ?? false;
+
+    public async Task SetBrowserVisibleAsync(bool visible)
+    {
+        if (_host is null)
+        {
+            return;
+        }
+
+        await _host.SetVisibleAsync(visible, CancellationToken.None);
+        BrowserStateChanged?.Invoke();
+    }
 
     public bool IsConnected => _feedPage is not null;
 
@@ -36,23 +70,21 @@ internal sealed class YouTubeService : IAsyncDisposable
             return;
         }
 
-        var chromePath = PlaywrightService.FindRealChromeExecutable()
-            ?? throw new InvalidOperationException(T("Không tìm thấy Google Chrome/Edge trên máy.", "Google Chrome/Edge was not found on this computer."));
-
         try
         {
-            var port = GetFreePort();
-            _chrome = Process.Start(new ProcessStartInfo
-            {
-                FileName = chromePath,
-                Arguments = $"--remote-debugging-port={port} --user-data-dir=\"{AppPaths.YouTubeProfileDir}\" --no-first-run --no-default-browser-check --window-size=1280,900 about:blank",
-                UseShellExecute = false,
-            }) ?? throw new InvalidOperationException(T("Không khởi chạy được Chrome.", "Could not start Chrome."));
-
             _playwright = await Playwright.CreateAsync();
-            _browser = await ConnectOverCdpAsync(_playwright, port, ct);
-            _context = _browser.Contexts.FirstOrDefault() ?? await _browser.NewContextAsync();
-            var page = _context.Pages.FirstOrDefault() ?? await _context.NewPageAsync();
+            _host = BrowserHosts.Create(_embedded, _startHidden);
+            _context = await _host.StartAsync(
+                _playwright,
+                _embedded ? AppPaths.YouTubeWebViewDir : AppPaths.YouTubeProfileDir,
+                T("Social Toolkit — Trình duyệt YouTube", "Social Toolkit — YouTube browser"),
+                ct);
+            var page = await _host.GetMainPageAsync(ct);
+            _gate = new ChallengeGate("YouTube", _host, () => new[] { page, _agePage }.Where(p => p is not null).Select(p => p!).ToList())
+            {
+                CooldownSeconds = () => ChallengeCooldownSeconds,
+            };
+            _gate.Notice += text => ChallengeNotice?.Invoke(text);
 
             await EnsureSignedInAsync(page, log, ct);
 
@@ -75,7 +107,7 @@ internal sealed class YouTubeService : IAsyncDisposable
 
         try
         {
-            if (_chrome is not null && _chrome.HasExited)
+            if (_host is not { IsRunning: true })
             {
                 return false;
             }
@@ -103,8 +135,8 @@ internal sealed class YouTubeService : IAsyncDisposable
             return;
         }
 
-        log.Report(T("Chưa đăng nhập — mở trang đăng nhập Google. Hãy đăng nhập trong cửa sổ Chrome vừa mở (tối đa 5 phút)...",
-                     "Not signed in — opening the Google sign-in page. Please sign in in the Chrome window that just opened (up to 5 minutes)..."));
+        log.Report(T("Chưa đăng nhập — mở trang đăng nhập Google. Hãy đăng nhập trong cửa sổ trình duyệt vừa mở (tối đa 5 phút)...",
+                     "Not signed in — opening the Google sign-in page. Please sign in in the browser window that just opened (up to 5 minutes)..."));
         await page.GotoAsync(SignInUrl, new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 30_000 });
 
         var signedIn = false;
@@ -112,6 +144,11 @@ internal sealed class YouTubeService : IAsyncDisposable
         while (DateTime.UtcNow < deadline && !signedIn)
         {
             ct.ThrowIfCancellationRequested();
+            if (_host is not { IsRunning: true })
+            {
+                throw new InvalidOperationException(T("Cửa sổ trình duyệt đã đóng trước khi đăng nhập xong.", "The browser window was closed before sign-in finished."));
+            }
+
             await Task.Delay(2000, ct);
             try
             {
@@ -228,12 +265,26 @@ internal sealed class YouTubeService : IAsyncDisposable
 
     /// <summary>Reads how long ago the newest video was posted from the channel's Videos tab (default sort: Latest) in a
     /// second tab. Approximate by design: YouTube shows "13h ago", "5d ago", "9mo ago", "3y ago".</summary>
-    public async Task<AgeResult> ReadLatestUploadAsync(string channelUrl, CancellationToken ct)
+    public Task<AgeResult> ReadLatestUploadAsync(string channelUrl, CancellationToken ct)
     {
-        var context = _context ?? throw new InvalidOperationException("Not connected.");
-        _agePage ??= await context.NewPageAsync();
+        Task<AgeResult> Step() => ReadLatestUploadCoreAsync(channelUrl, ct);
+        return _gate is null ? Step() : _gate.RunStepAsync(Step, T("đọc ngày đăng video", "reading the latest upload"), ct);
+    }
+
+    private async Task<AgeResult> ReadLatestUploadCoreAsync(string channelUrl, CancellationToken ct)
+    {
+        if (_context is null || _host is null)
+        {
+            throw new InvalidOperationException("Not connected.");
+        }
+
+        _agePage ??= await _host.NewWorkerPageAsync(ct);
         var page = _agePage;
-        await page.BringToFrontAsync();
+        if (!_embedded)
+        {
+            // A background Chrome tab is throttled, so bring it forward; the built-in reading frame is hidden on purpose.
+            await page.BringToFrontAsync();
+        }
 
         var path = new Uri(channelUrl).AbsolutePath.TrimEnd('/');
         await page.GotoAsync($"https://www.youtube.com{path}/videos?hl=en", new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 30_000 });
@@ -280,7 +331,14 @@ internal sealed class YouTubeService : IAsyncDisposable
     /// <summary>Unsubscribes one channel on the list tab: finds its row by link, DOM-clicks the (hidden) subscribed button,
     /// confirms YouTube's dialog and waits for the server's HTTP answer, which is the only real proof it worked (the
     /// button flips instantly in the UI, and navigating away too early cancels the request).</summary>
-    public async Task<(bool Ok, string? Error)> UnsubscribeAsync(YouTubeChannel channel, CancellationToken ct)
+    public Task<(bool Ok, string? Error)> UnsubscribeAsync(YouTubeChannel channel, CancellationToken ct)
+    {
+        // A finished unsubscribe is kept even if a verification shows up right after it (it must not be repeated).
+        Task<(bool Ok, string? Error)> Step() => UnsubscribeCoreAsync(channel, ct);
+        return _gate is null ? Step() : _gate.RunStepAsync(Step, T("hủy đăng ký kênh", "unsubscribing"), ct, redoWhenChallengedAfterSuccess: false);
+    }
+
+    private async Task<(bool Ok, string? Error)> UnsubscribeCoreAsync(YouTubeChannel channel, CancellationToken ct)
     {
         var page = _feedPage ?? throw new InvalidOperationException("Not connected.");
         await page.BringToFrontAsync();
@@ -417,60 +475,14 @@ internal sealed class YouTubeService : IAsyncDisposable
         }
     }
 
-    private static int GetFreePort()
-    {
-        using var listener = new TcpListener(System.Net.IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
-    }
-
-    private static async Task<IBrowser> ConnectOverCdpAsync(IPlaywright playwright, int port, CancellationToken ct)
-    {
-        Exception? last = null;
-        for (var i = 0; i < 20; i++)
-        {
-            ct.ThrowIfCancellationRequested();
-            try
-            {
-                return await playwright.Chromium.ConnectOverCDPAsync($"http://localhost:{port}");
-            }
-            catch (Exception ex)
-            {
-                last = ex;
-                await Task.Delay(500, ct);
-            }
-        }
-
-        throw new InvalidOperationException(
-            T($"Không kết nối được vào Chrome (cổng {port}). Nếu một cửa sổ Chrome của tool đang mở sẵn, hãy đóng nó rồi thử lại.",
-              $"Could not connect to Chrome (port {port}). If a Chrome window opened by this tool is already open, close it and try again."), last);
-    }
-
-    /// <summary>Quits Chrome through its own CDP "Browser.close" so the profile is flushed cleanly (the sign-in cookies
-    /// survive); a hard kill can lose the newest cookies. Falls back to killing the process.</summary>
+    /// <summary>Closes the browser (Chrome is quit through CDP so the profile is flushed; the built-in window is simply closed).</summary>
     public async ValueTask DisposeAsync()
     {
         try
         {
-            var page = _feedPage ?? _agePage ?? _context?.Pages.FirstOrDefault();
-            if (page is not null)
+            if (_host is not null)
             {
-                var session = await page.Context.NewCDPSessionAsync(page);
-                await session.SendAsync("Browser.close");
-            }
-        }
-        catch
-        {
-            // fall through to the process-level cleanup
-        }
-
-        try
-        {
-            if (_chrome is not null && !_chrome.WaitForExit(6000))
-            {
-                _chrome.Kill(entireProcessTree: true);
+                await _host.DisposeAsync();
             }
         }
         catch
@@ -480,11 +492,10 @@ internal sealed class YouTubeService : IAsyncDisposable
 
         try { _playwright?.Dispose(); } catch { /* best effort */ }
 
-        _chrome = null;
+        _host = null;
         _playwright = null;
-        _browser = null;
         _context = null;
         _feedPage = null;
         _agePage = null;
-    }
-}
+        _gate = null;
+    }}
