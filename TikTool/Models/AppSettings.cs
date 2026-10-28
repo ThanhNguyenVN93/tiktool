@@ -33,6 +33,6 @@ public class AppSettings
     public bool StartWithWindows { get; set; }
     public bool MinimizeToTray { get; set; }
     public string Theme { get; set; } = "Dark";
-    // "vi" | "en"
-    public string Language { get; set; } = "vi";
+    // "vi" | "en" (a fresh install starts in English; the user can switch in Settings)
+    public string Language { get; set; } = "en";
 }

@@ -59,7 +59,7 @@ Paste links (several, one per line), pick MP4 / MP3 / MKV, choose the folder and
 | Skip mutual follows | Do not unfollow people who follow you back (on by default) |
 | Auto-wait on rate limit, wait time | On by default, 90 s; also the pause after a captcha is solved |
 | Start with Windows / minimize to tray | Optional; the tray menu has shortcuts to the tabs |
-| Language | Vietnamese or English (the app restarts by itself) |
+| Language | English (default) or Vietnamese (the app restarts by itself) |
 | Logs → Open folder | Opens the log folder |
 
 ## 8. Where data is kept, privacy

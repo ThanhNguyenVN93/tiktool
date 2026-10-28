@@ -59,7 +59,7 @@ Dán link (nhiều link, mỗi dòng một cái), chọn MP4 / MP3 / MKV, chọn
 | Bỏ qua bạn bè | Không bỏ theo dõi người đang theo dõi lại bạn (mặc định bật) |
 | Tự chờ khi bị giới hạn, thời gian chờ | Mặc định bật, 90 giây; cũng là thời gian nghỉ sau khi giải captcha |
 | Khởi động cùng Windows / thu nhỏ xuống khay | Tùy chọn; menu khay có đường tắt tới các tab |
-| Ngôn ngữ | Tiếng Việt hoặc English (app tự khởi động lại) |
+| Ngôn ngữ | English (mặc định) hoặc Tiếng Việt (app tự khởi động lại) |
 | Nhật ký → Mở thư mục | Mở thư mục log |
 
 ## 8. Dữ liệu lưu ở đâu, quyền riêng tư
