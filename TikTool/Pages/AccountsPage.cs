@@ -111,6 +111,7 @@ internal sealed class AccountsPage : UserControl
         _status.Font = Theme.FontMedium;
         _status.ForeColor = Theme.TextSecondary;
         _status.AutoSize = false;
+        _status.AutoEllipsis = true;
         _status.Location = new Point(24 + 110 + 8 + 110 + 20, 15);
         _status.Height = 22;
 
@@ -203,7 +204,7 @@ internal sealed class AccountsPage : UserControl
             }
             else
             {
-                _status.Text = T("TikTok: chưa đăng nhập — đăng nhập bên dưới, tool tự nhận khi xong.", "TikTok: not signed in — sign in below, the tool notices when you are done.");
+                _status.Text = T("TikTok: chưa đăng nhập — đăng nhập bên dưới", "TikTok: not signed in — sign in below");
                 _webTikTok.Visible = true;
                 _btnSignOut.Visible = false;
             }
@@ -226,7 +227,7 @@ internal sealed class AccountsPage : UserControl
             }
             else
             {
-                _status.Text = T("YouTube: chưa đăng nhập — đăng nhập Google bên dưới, tool tự nhận khi xong.", "YouTube: not signed in — sign in to Google below, the tool notices when you are done.");
+                _status.Text = T("YouTube: chưa đăng nhập — đăng nhập bên dưới", "YouTube: not signed in — sign in below");
                 _webYouTube.Visible = true;
                 _btnSignOut.Visible = false;
             }
