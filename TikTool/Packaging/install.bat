@@ -3,19 +3,17 @@ setlocal EnableExtensions
 title Social Toolkit - install
 rem Installs Social Toolkit for the current user only: no administrator rights, no registry entries.
 rem Everything this file does is written below, in plain text. Nothing is downloaded.
+rem The program itself is inside SocialToolkit-package.exe (a self-extracting 7-Zip archive) next to this file.
 
 set "SRC=%~dp0"
+set "PKG=%SRC%SocialToolkit-package.exe"
 set "DEST=%LOCALAPPDATA%\Programs\SocialToolkit"
 set "STARTLNK=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Social Toolkit.lnk"
 set "DESKLNK=%USERPROFILE%\Desktop\Social Toolkit.lnk"
+set "YTKEEP=%TEMP%\socialtoolkit_ytdlp_keep.exe"
 
-if not exist "%SRC%TikTool.exe" (
-    echo TikTool.exe was not found next to install.bat. Unzip the whole zip first, then run this file from the unzipped folder.
-    pause
-    exit /b 1
-)
-if /i "%SRC%"=="%DEST%\" (
-    echo This is already the installed copy.
+if not exist "%PKG%" (
+    echo SocialToolkit-package.exe was not found next to install.bat. Unzip the whole zip first, then run this file from the unzipped folder.
     pause
     exit /b 1
 )
@@ -33,14 +31,20 @@ echo.
 choice /c YN /n /m "Continue? [Y/N] "
 if errorlevel 2 exit /b 0
 
-rem A yt-dlp.exe / ffmpeg.exe that is already installed (the user may have updated it) is kept.
-set "KEEP="
-if exist "%DEST%\Resources\yt-dlp.exe" set "KEEP=yt-dlp.exe ffmpeg.exe"
-robocopy "%SRC%." "%DEST%" /E /NFL /NDL /NJH /NJS /NP /XF install.bat portable.bat portable.flag %KEEP% /XD Data >nul
-if errorlevel 8 (
-    echo Copying the files failed.
+rem A yt-dlp.exe that is already installed (the user may have updated it) is kept.
+if exist "%YTKEEP%" del /q "%YTKEEP%"
+if exist "%DEST%\Resources\yt-dlp.exe" copy /y "%DEST%\Resources\yt-dlp.exe" "%YTKEEP%" >nul
+
+echo Unpacking, please wait...
+"%PKG%" -y -o"%DEST%" >nul
+if errorlevel 1 (
+    echo Unpacking failed.
     pause
     exit /b 1
+)
+if exist "%YTKEEP%" (
+    copy /y "%YTKEEP%" "%DEST%\Resources\yt-dlp.exe" >nul
+    del /q "%YTKEEP%"
 )
 copy /y "%SRC%uninstall.bat" "%DEST%\uninstall.bat" >nul
 

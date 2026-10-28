@@ -13,11 +13,10 @@ Tên hiển thị là **Social Toolkit**; tên file chạy và thư mục dữ l
 ## 1. Cài đặt
 
 1. Vào trang **[Releases](https://github.com/ThanhNguyenVN93/tiktool/releases)**, tải file `SocialToolkit-…-win-x64.zip`.
-2. **Chuột phải file zip → Properties → tích *Unblock* → OK** (nếu có), rồi giải nén ra một thư mục bất kỳ (ví dụ `D:\SocialToolkit`). Trong đó có hai file chạy nhanh, chọn một:
+2. **Chuột phải file zip → Properties → tích *Unblock* → OK** (nếu có), rồi giải nén. Trong zip có: `install.bat`, `portable.bat`, `uninstall.bat`, `HOW TO USE.txt` và một file `SocialToolkit-package.exe` (chính là app, đã nén; hai file bat tự chạy nó giúp bạn). Chọn một:
    - **`install.bat`**: cài cho riêng bạn vào `%LOCALAPPDATA%\Programs\SocialToolkit` (không cần quyền admin, không ghi registry), tạo shortcut trong Start Menu và (nếu bạn muốn) trên Desktop. Gỡ bằng `uninstall.bat` trong thư mục cài (hỏi có xóa dữ liệu không, mặc định là không).
-   - **`portable.bat`**: chạy ngay tại chỗ, mang theo được (USB...). **Toàn bộ dữ liệu** (tài khoản, lịch sử, cài đặt, nhật ký, video tải) nằm trong thư mục `Data` cạnh file chạy; xóa thư mục là sạch. Muốn quay về chế độ thường, xóa file `portable.flag`. Lưu ý: phiên đăng nhập TikTok được mã hóa theo tài khoản Windows, nên sang máy khác phải đăng nhập lại.
-   - Hoặc không dùng cả hai: chạy thẳng **`TikTool.exe`** (dữ liệu nằm ở `%APPDATA%\TikTool`).
-   Không cần cài .NET, không cần cài Chrome. Các file `.bat` là văn bản thường, bạn mở bằng Notepad xem được mọi thứ chúng làm.
+   - **`portable.bat`**: giải nén app vào thư mục `SocialToolkit` ngay cạnh file bat rồi chạy, không cài gì vào máy. **Toàn bộ dữ liệu** (tài khoản, lịch sử, cài đặt, nhật ký, video tải) nằm trong `SocialToolkit\Data`; xóa thư mục là sạch, mang USB được. Muốn quay về chế độ thường, xóa file `SocialToolkit\portable.flag`. Lưu ý: phiên đăng nhập TikTok được mã hóa theo tài khoản Windows, nên sang máy khác phải đăng nhập lại.
+   Không cần cài .NET, không cần cài Chrome. Các file `.bat` là văn bản thường, mở bằng Notepad xem được mọi thứ chúng làm. (Bản `…-win-x64.zip` là bản dùng cho tính năng tự cập nhật; dùng được tay nhưng không có hai file bat.)
 3. Yêu cầu: **Windows 10/11 64-bit** và **WebView2 Runtime** (Windows 11 có sẵn; Windows 10 thường đã có). Nếu app báo thiếu, tải "Evergreen Bootstrapper" tại <https://developer.microsoft.com/microsoft-edge/webview2/>.
 4. **Windows SmartScreen / antivirus có thể cảnh báo** vì app chưa được ký số (chữ ký số là loại chứng chỉ trả phí). Bấm *Thông tin thêm → Vẫn chạy*. Bạn có thể so mã SHA256 của file zip với mã ghi trên trang Release để chắc file không bị sửa.
 
