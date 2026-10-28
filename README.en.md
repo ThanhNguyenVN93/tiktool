@@ -13,11 +13,10 @@ The display name is **Social Toolkit**; the executable and the data folder are s
 ## 1. Install
 
 1. Open the **[Releases](https://github.com/ThanhNguyenVN93/tiktool/releases)** page and download `SocialToolkit-…-win-x64.zip`.
-2. **Right-click the zip → Properties → tick *Unblock* → OK** (if shown), then unzip it anywhere (for example `D:\SocialToolkit`). It contains two ready-made launchers, pick one:
+2. **Right-click the zip → Properties → tick *Unblock* → OK** (if shown), then unzip it. It contains `install.bat`, `portable.bat`, `uninstall.bat`, `HOW TO USE.txt` and one file, `SocialToolkit-package.exe` (the app itself, packed; the two bat files run it for you). Pick one:
    - **`install.bat`**: installs for you only into `%LOCALAPPDATA%\Programs\SocialToolkit` (no administrator rights, no registry entries), creates a Start Menu shortcut and, if you want, a Desktop one. Remove it with `uninstall.bat` in the install folder (it asks whether to delete your data; the default is no).
-   - **`portable.bat`**: runs right where it is and can travel (USB stick...). **All data** (accounts, history, settings, logs, downloads) lives in a `Data` folder next to the program; delete the folder and nothing is left. To go back to normal mode, delete the file `portable.flag`. Note: the TikTok sign-in is encrypted for your Windows account, so on another PC you sign in again.
-   - Or use neither and run **`TikTool.exe`** directly (data then lives in `%APPDATA%\TikTool`).
-   No .NET to install, no Chrome needed. The `.bat` files are plain text: open them in Notepad to see everything they do.
+   - **`portable.bat`**: unpacks the app into a `SocialToolkit` folder next to the bat file and runs it, nothing is installed. **All data** (accounts, history, settings, logs, downloads) lives in `SocialToolkit\Data`; delete the folder and nothing is left; it can travel on a USB stick. To go back to normal mode, delete `SocialToolkit\portable.flag`. Note: the TikTok sign-in is encrypted for your Windows account, so on another PC you sign in again.
+   No .NET to install, no Chrome needed. The `.bat` files are plain text: open them in Notepad to see everything they do. (The `…-win-x64.zip` asset is the one the in-app updater uses; it works by hand too but has no bat files.)
 3. Requirements: **Windows 10/11 64-bit** and the **WebView2 Runtime** (included with Windows 11; usually present on Windows 10). If the app says it is missing, get the "Evergreen Bootstrapper" from <https://developer.microsoft.com/microsoft-edge/webview2/>.
 4. **Windows SmartScreen / antivirus may warn** because the app is not code-signed (a code-signing certificate is a paid item). Press *More info → Run anyway*. You can compare the SHA256 of the zip with the one on the Release page to be sure the file is untouched.
 

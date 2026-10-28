@@ -1,0 +1,31 @@
+SOCIAL TOOLKIT - HOW TO USE / HUONG DAN
+=========================================
+
+Needs Windows 10/11 64-bit and the WebView2 Runtime (Windows 11 has it; on Windows 10 the app tells you if it is missing).
+Can: Windows 10/11 64-bit va WebView2 Runtime (Windows 11 co san).
+
+Tip: right-click the downloaded .zip -> Properties -> tick "Unblock" -> OK, then unzip.
+Meo: chuot phai file .zip -> Properties -> tick "Unblock" -> OK, roi moi giai nen.
+
+Pick ONE / Chon MOT trong hai:
+
+1) install.bat   - install for you only (no administrator rights, no registry)
+   Cai cho rieng ban, khong can quyen admin, khong ghi registry.
+   - Program goes to %LOCALAPPDATA%\Programs\SocialToolkit, with a Start Menu shortcut (Desktop shortcut optional).
+   - Your data stays in %APPDATA%\TikTool.
+   - Remove it with uninstall.bat in the install folder (it asks before deleting your data; default: keep).
+
+2) portable.bat  - unpack next to this file and run, nothing is installed
+   Giai nen ngay canh file nay va chay, khong cai gi vao may.
+   - The program goes to the SocialToolkit folder next to this file; ALL data is kept in SocialToolkit\Data.
+   - Delete the SocialToolkit folder and nothing is left. Can be moved to a USB stick.
+   - The TikTok sign-in is tied to your Windows account: on another PC you sign in again.
+
+What is in this zip / Trong file zip:
+   SocialToolkit-package.exe  the program, packed (self-extracting 7-Zip archive; the .bat files run it for you)
+   install.bat, portable.bat, uninstall.bat   plain text: open them in Notepad to see everything they do.
+
+The app is not code-signed, so SmartScreen / antivirus may warn. Compare the SHA256 on the release page.
+App chua duoc ky so nen SmartScreen / antivirus co the canh bao; doi chieu SHA256 tren trang release.
+
+Full guide: https://github.com/ThanhNguyenVN93/tiktool  (README.md Tieng Viet, README.en.md English)
