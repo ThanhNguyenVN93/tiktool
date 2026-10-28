@@ -13,6 +13,8 @@ internal sealed class ChromeBrowserHost : IBrowserHost
 
     public bool IsRunning => _process is { HasExited: false };
 
+    public bool WorkerRunsOneAtATime => false;
+
     public async Task<IBrowserContext> StartAsync(IPlaywright playwright, string profileDir, string windowTitle, CancellationToken ct)
     {
         var chromePath = PlaywrightService.FindRealChromeExecutable()
@@ -29,6 +31,12 @@ internal sealed class ChromeBrowserHost : IBrowserHost
         var browser = await BrowserCdp.ConnectAsync(playwright, port, ct);
         _context = browser.Contexts.FirstOrDefault() ?? await browser.NewContextAsync();
         return _context;
+    }
+
+    public async Task<IPage> GetMainPageAsync(CancellationToken ct)
+    {
+        var context = _context ?? throw new InvalidOperationException("Not started.");
+        return context.Pages.FirstOrDefault() ?? await context.NewPageAsync();
     }
 
     public Task<IPage> NewWorkerPageAsync(CancellationToken ct) =>

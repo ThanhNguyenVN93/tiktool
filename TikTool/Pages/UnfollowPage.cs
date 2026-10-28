@@ -1,5 +1,6 @@
 using Guna.UI2.WinForms;
 using TikTool.Forms;
+using TikTool.Browser;
 using TikTool.Models;
 using TikTool.Services;
 
@@ -17,7 +18,7 @@ internal sealed class UnfollowPage : UserControl
     private readonly SessionStateService _sessionStateService;
 
     /// <summary>Asks the shell to open the Accounts tab (set by MainForm) when TikTok is not signed in.</summary>
-    public Action? RequestLogin { get; set; }
+    public Action<string>? RequestLogin { get; set; }
 
     private readonly List<FollowingAccount> _accounts = new();
     private readonly Dictionary<FollowingAccount, FollowingItemControl> _rows = new();
@@ -505,7 +506,7 @@ internal sealed class UnfollowPage : UserControl
         {
             _log.Log(T("[Unfollow] Chưa đăng nhập TikTok — mở tab Tài khoản để đăng nhập trước.",
                         "[Unfollow] Not signed in to TikTok — opening the Accounts tab."), LogLevel.Warn);
-            RequestLogin?.Invoke();
+            RequestLogin?.Invoke("tiktok");
             return;
         }
 
@@ -626,21 +627,22 @@ internal sealed class UnfollowPage : UserControl
     {
         await _playwright.DisposeAsync();
         await EnsureChromeAsync();
-        await _playwright.LaunchAsync(cookie);
+        await _playwright.LaunchAsync(cookie, BrowserHosts.UseEmbedded(_settingsService.Current));
     }
 
     private async Task EnsurePlaywrightAsync(TikTokCookie cookie)
     {
         if (_playwright.IsLaunched) return;
+        await _playwright.DisposeAsync();
         await EnsureChromeAsync();
-        await _playwright.LaunchAsync(cookie);
+        await _playwright.LaunchAsync(cookie, BrowserHosts.UseEmbedded(_settingsService.Current));
     }
 
     /// <summary>Ensures Chrome/Edge is installed — downloads and installs silently if not found.
     /// Shows download progress in the log panel. Throws if user cancels or install fails.</summary>
     private async Task EnsureChromeAsync()
     {
-        if (PlaywrightService.FindRealChromeExecutable() is not null) return;
+        if (BrowserHosts.UseEmbedded(_settingsService.Current) || PlaywrightService.FindRealChromeExecutable() is not null) return;
 
         _log.Log(T("Đang tải Chrome offline installer (~80 MB)...",
                    "Downloading Chrome offline installer (~80 MB)..."), LogLevel.Info);

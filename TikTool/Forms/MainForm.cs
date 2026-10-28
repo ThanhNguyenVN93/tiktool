@@ -81,8 +81,9 @@ public sealed class MainForm : Form
         unfollowPage.RequestLogin = OpenAccounts;
         RegisterPage(TikTokUnfollowKey, unfollowPage);
         _youTubePage = new YouTubePage(settingsService, historyService);
+        _youTubePage.RequestLogin = OpenAccounts;
         RegisterPage(YouTubeUnsubKey, _youTubePage);
-        var accountsPage = new AccountsPage(cookieService, playwrightService);
+        var accountsPage = new AccountsPage(cookieService, playwrightService, settingsService);
         accountsPage.CookieStatusChanged += () => _ = RefreshFooterAsync();
         RegisterPage("accounts", accountsPage);
         RegisterPage("settings", new SettingsPage(settingsService));
@@ -157,7 +158,14 @@ public sealed class MainForm : Form
     }
 
     /// <summary>Called by a feature page that needs the user to sign in first.</summary>
-    public void OpenAccounts() => NavigateTo("accounts");
+    public void OpenAccounts(string platform)
+    {
+        NavigateTo("accounts");
+        if (_pages.TryGetValue("accounts", out var page) && page is AccountsPage accounts)
+        {
+            accounts.ShowPlatform(platform);
+        }
+    }
 
     private void OpenFromTray(string pageKey)
     {

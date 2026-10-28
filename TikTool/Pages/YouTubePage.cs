@@ -2,6 +2,7 @@
 using System.Text;
 using Guna.UI2.WinForms;
 using TikTool.Forms;
+using TikTool.Browser;
 using TikTool.Models;
 using TikTool.Services;
 
@@ -566,7 +567,23 @@ internal sealed class YouTubePage : UserControl
         }
     }
 
-    private Task ConnectAndLoadAsync() => RunBusyAsync(async ct =>
+    /// <summary>Asks the shell to open the Accounts tab on the given platform (set by MainForm) when the user is not signed in.</summary>
+    public Action<string>? RequestLogin { get; set; }
+
+    private Task ConnectAndLoadAsync()
+    {
+        if (BrowserHosts.UseEmbedded(_settings.Current) && !GoogleSession.IsSignedIn())
+        {
+            _log.Log(T("[YouTube] Chưa đăng nhập Google — mở tab Tài khoản để đăng nhập trước.",
+                       "[YouTube] Not signed in to Google — opening the Accounts tab."), LogLevel.Warn);
+            RequestLogin?.Invoke("youtube");
+            return Task.CompletedTask;
+        }
+
+        return ConnectAndLoadCoreAsync();
+    }
+
+    private Task ConnectAndLoadCoreAsync() => RunBusyAsync(async ct =>
     {
         var progress = MakeProgress();
         if (_service is not null && !await _service.IsAliveAsync())
@@ -576,7 +593,7 @@ internal sealed class YouTubePage : UserControl
             _service = null;
         }
 
-        _service ??= new YouTubeService(_settings.Current.UseEmbeddedBrowser);
+        _service ??= new YouTubeService(BrowserHosts.UseEmbedded(_settings.Current));
         progress.Report(T("Đang mở trình duyệt riêng...", "Opening the separate browser window..."));
         await _service.ConnectAsync(progress, ct);
 

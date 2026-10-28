@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text.Json;
 using Microsoft.Playwright;
+using TikTool.Browser;
 using TikTool.Models;
 
 namespace TikTool.Services;
@@ -24,49 +25,46 @@ namespace TikTool.Services;
 public sealed class PlaywrightService : IAsyncDisposable
 {
     private IPlaywright? _playwright;
-    private IBrowser? _browser;
     private IBrowserContext? _context;
     private IPage? _page;
-    private Process? _chromeProcess;
+    private IBrowserHost? _host;
+    private IPage? _workerPage;
+    private readonly SemaphoreSlim _workerGate = new(1, 1);
     private string? _profileDir;
 
-    public bool IsLaunched => _page is not null;
+    /// <summary>True while the browser is up. A closed window counts as not launched, so the next run starts a fresh one.</summary>
+    public bool IsLaunched => _page is not null && _host is { IsRunning: true };
 
-    public async Task LaunchAsync(TikTokCookie cookie, bool headless = false)
+    /// <param name="embedded">true = the built-in WebView2 window (its profile folder is shared with the Accounts tab), false = the installed Chrome/Edge with a throwaway profile.</param>
+    public async Task LaunchAsync(TikTokCookie cookie, bool embedded = false)
     {
         TryFlushDnsCache();
 
-        var chromePath = FindRealChromeExecutable();
-        _playwright = await Playwright.CreateAsync();
-
-        if (chromePath is not null)
+        string profile;
+        if (embedded)
         {
-            // CDP-attach to real Chrome/Edge — the only mode confirmed to work against TikTok.
-            var port = GetFreeTcpPort();
-            _profileDir = Path.Combine(Path.GetTempPath(), $"tiktool_chrome_session_{Guid.NewGuid():N}");
-            Directory.CreateDirectory(_profileDir);
-
-            var headlessArg = headless ? "--headless=new " : "";
-            _chromeProcess = Process.Start(new ProcessStartInfo
-            {
-                FileName = chromePath,
-                Arguments = $"{headlessArg}--remote-debugging-port={port} --user-data-dir=\"{_profileDir}\" --no-first-run --no-default-browser-check --window-size=1440,900 about:blank",
-                UseShellExecute = false,
-            }) ?? throw new InvalidOperationException(T("Không khởi chạy được Chrome/Edge.", "Could not start Chrome/Edge."));
-
-            _browser = await ConnectWithRetryAsync(_playwright, port, CancellationToken.None);
-            _context = _browser.Contexts.FirstOrDefault() ?? await _browser.NewContextAsync();
+            profile = AppPaths.TikTokWebViewDir;
         }
         else
         {
-            throw new InvalidOperationException(
-                T("Không tìm thấy Google Chrome hoặc Microsoft Edge trên máy.\n", "Google Chrome or Microsoft Edge was not found on this computer.\n") +
-                T("Social Toolkit cần attach vào Chrome/Edge thật (TikTok chặn trình duyệt tự động).\n", "Social Toolkit needs to attach to a real Chrome/Edge (TikTok blocks automated browsers).\n") +
-                T("Hãy cài Google Chrome: https://www.google.com/chrome/", "Please install Google Chrome: https://www.google.com/chrome/"));
+            if (FindRealChromeExecutable() is null)
+            {
+                throw new InvalidOperationException(
+                    T("Không tìm thấy Google Chrome hoặc Microsoft Edge trên máy.\n", "Google Chrome or Microsoft Edge was not found on this computer.\n") +
+                    T("Social Toolkit cần attach vào Chrome/Edge thật (TikTok chặn trình duyệt tự động).\n", "Social Toolkit needs to attach to a real Chrome/Edge (TikTok blocks automated browsers).\n") +
+                    T("Hãy cài Google Chrome: https://www.google.com/chrome/", "Please install Google Chrome: https://www.google.com/chrome/"));
+            }
+
+            _profileDir = Path.Combine(Path.GetTempPath(), $"tiktool_chrome_session_{Guid.NewGuid():N}");
+            Directory.CreateDirectory(_profileDir);
+            profile = _profileDir;
         }
 
+        _playwright = await Playwright.CreateAsync();
+        _host = BrowserHosts.Create(embedded);
+        _context = await _host.StartAsync(_playwright, profile, T("Social Toolkit — Trình duyệt TikTok", "Social Toolkit — TikTok browser"), CancellationToken.None);
         await _context.AddCookiesAsync(BuildCookies(cookie));
-        _page = _context.Pages.FirstOrDefault() ?? await _context.NewPageAsync();
+        _page = await _host.GetMainPageAsync(CancellationToken.None);
 
         // Warm-up: this profile dir is brand new every launch (only cookies were injected, no
         // localStorage/device fingerprint), and navigating straight to a deep page like a profile
@@ -1396,6 +1394,21 @@ public sealed class PlaywrightService : IAsyncDisposable
         string username, CancellationToken ct = default)
     {
         EnsureLaunched();
+        if (_host is { WorkerRunsOneAtATime: true })
+        {
+            // The built-in browser has one hidden reading page: use it for one profile at a time.
+            await _workerGate.WaitAsync(ct);
+            try
+            {
+                _workerPage ??= await _host.NewWorkerPageAsync(ct);
+                return await GetUserDetailOnPageAsync(_workerPage, username, ct);
+            }
+            finally
+            {
+                _workerGate.Release();
+            }
+        }
+
         var page = await _context!.NewPageAsync();
         try
         {
@@ -1437,23 +1450,19 @@ public sealed class PlaywrightService : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        if (_context is not null)
+        try
         {
-            await _context.CloseAsync();
+            if (_host is not null)
+            {
+                await _host.DisposeAsync();
+            }
         }
-
-        if (_browser is not null)
+        catch
         {
-            await _browser.CloseAsync();
+            // best effort
         }
 
         _playwright?.Dispose();
-
-        if (_chromeProcess is not null)
-        {
-            TryKillChrome(_chromeProcess);
-            _chromeProcess.Dispose();
-        }
 
         if (_profileDir is not null)
         {
@@ -1461,10 +1470,9 @@ public sealed class PlaywrightService : IAsyncDisposable
         }
 
         _context = null;
-        _browser = null;
         _page = null;
+        _workerPage = null;
         _playwright = null;
-        _chromeProcess = null;
+        _host = null;
         _profileDir = null;
-    }
-}
+    }}

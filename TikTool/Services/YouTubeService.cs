@@ -52,7 +52,7 @@ internal sealed class YouTubeService : IAsyncDisposable
                 _embedded ? AppPaths.YouTubeWebViewDir : AppPaths.YouTubeProfileDir,
                 T("Social Toolkit — Trình duyệt YouTube", "Social Toolkit — YouTube browser"),
                 ct);
-            var page = _context.Pages.FirstOrDefault() ?? await _context.NewPageAsync();
+            var page = await _host.GetMainPageAsync(ct);
 
             await EnsureSignedInAsync(page, log, ct);
 

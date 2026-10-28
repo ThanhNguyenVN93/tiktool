@@ -4,18 +4,22 @@ using TikTool.Forms;
 
 namespace TikTool.Browser;
 
-/// <summary>The app's own browser window: one visible WebView2 for sign-in and the list, plus (on demand) a second control that is hidden
-/// right away and used for background reading. Both share one profile folder and one debugging port.</summary>
+/// <summary>The window that does the work: one visible WebView2 for the page being driven, plus (on demand) a second control that is hidden right
+/// away and used for background reading. Both come from a shared <see cref="WebViewSession"/> (same profile, same debugging port).</summary>
 internal sealed class BrowserWindow : Form
 {
     private readonly WebView2 _main = new() { Dock = DockStyle.Fill };
     private WebView2? _worker;
-    private CoreWebView2Environment? _env;
+    private readonly WebViewSession _session;
 
     public bool IsOpen { get; private set; } = true;
 
-    private BrowserWindow(string title)
+    /// <summary>Marker in the main control's URL so the Playwright page of THIS control can be told apart from other controls' pages.</summary>
+    public string MainMarker { get; } = "tiktool-main-" + Guid.NewGuid().ToString("N");
+
+    private BrowserWindow(WebViewSession session, string title)
     {
+        _session = session;
         Text = title;
         Icon = MainForm.LoadAppIcon();
         Size = new Size(1180, 820);
@@ -25,16 +29,14 @@ internal sealed class BrowserWindow : Form
         FormClosed += (_, _) => IsOpen = false;
     }
 
-    public static async Task<BrowserWindow> OpenAsync(string profileDir, int port, string title)
+    public static async Task<BrowserWindow> OpenAsync(WebViewSession session, string title)
     {
-        var window = new BrowserWindow(title);
+        var window = new BrowserWindow(session, title);
         window.Show();
 
-        Directory.CreateDirectory(profileDir);
-        var options = new CoreWebView2EnvironmentOptions { AdditionalBrowserArguments = $"--remote-debugging-port={port}" };
-        window._env = await CoreWebView2Environment.CreateAsync(null, profileDir, options);
-        await window._main.EnsureCoreWebView2Async(window._env);
-        window._main.CoreWebView2.Navigate("about:blank");
+        var env = await session.GetEnvironmentAsync();
+        await window._main.EnsureCoreWebView2Async(env);
+        window._main.CoreWebView2.Navigate("about:blank#" + window.MainMarker);
         return window;
     }
 
@@ -46,7 +48,7 @@ internal sealed class BrowserWindow : Form
             // Dock=Fill (the main control) was added first; Right-docked controls come after it.
             _worker = new WebView2 { Dock = DockStyle.Right, Width = 360 };
             Controls.Add(_worker);
-            await _worker.EnsureCoreWebView2Async(_env);
+            await _worker.EnsureCoreWebView2Async(await _session.GetEnvironmentAsync());
         }
 
         _worker.CoreWebView2.Navigate("about:blank#" + marker);

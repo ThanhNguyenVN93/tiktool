@@ -115,16 +115,16 @@ internal sealed class GuidePage : UserControl
                   "4. Select channels to unfollow (or Select inactive / Select all shown), then click Start."),
                 T("5. Giới hạn mỗi phiên: mặc định 50 kênh/lần để tránh bị TikTok khoá tài khoản.",
                   "5. Session limit: default 50 per run to avoid TikTok account restrictions."),
-                T("⚠️ Cần cài sẵn Google Chrome (hoặc Edge) trên máy; Social Toolkit điều khiển chính trình duyệt đó, không tải thêm gì.",
-                  "⚠️ Google Chrome (or Edge) must be installed; Social Toolkit drives that browser and downloads nothing extra."),
+                T("⚠️ Mặc định dùng trình duyệt tích hợp của app (WebView2, có sẵn trên Windows 11). Nếu tắt trong Cài đặt thì cần Google Chrome (hoặc Edge) cài sẵn.",
+                  "⚠️ By default the app uses its built-in browser (WebView2, included with Windows 11). If you turn that off in Settings, Google Chrome (or Edge) must be installed."),
             }));
 
         flow.Controls.Add(BuildSection("▶️", T("Tab YouTube — Hủy đăng ký kênh không hoạt động", "YouTube Tab — Unsubscribe inactive channels"),
-            T("Dùng một cửa sổ Chrome riêng của tool; bạn đăng nhập Google một lần", "Uses a separate Chrome window of the tool; you sign in to Google once"),
+            T("Dùng trình duyệt tích hợp của tool; bạn đăng nhập Google một lần ở tab Tài khoản", "Uses the tool's built-in browser; you sign in to Google once on the Accounts tab"),
             new[]
             {
-                T("1. Vào Bỏ theo dõi → YouTube Unsubscribe, bấm \"Kết nối\". Một cửa sổ Chrome riêng mở ra; đăng nhập Google nếu được hỏi (lần sau không cần).",
-                  "1. Go to Unfollow → YouTube Unsubscribe and click \"Connect\". A separate Chrome window opens; sign in to Google if asked (not needed next time)."),
+                T("1. Vào tab Tài khoản → YouTube và đăng nhập Google một lần (lần sau không cần). Rồi vào Bỏ theo dõi → YouTube Unsubscribe, bấm \"Kết nối\": một cửa sổ trình duyệt của app mở ra để đọc danh sách.",
+                  "1. Open the Accounts tab → YouTube and sign in to Google once (not needed next time). Then go to Unfollow → YouTube Unsubscribe and click \"Connect\": an app browser window opens to read the list."),
                 T("2. Tool tải danh sách đăng ký rồi tự đọc ngày đăng video mới nhất của từng kênh (khoảng 1–2 giây mỗi kênh, được nhớ 7 ngày). Có thể bấm Dừng bất cứ lúc nào.",
                   "2. The tool loads your subscriptions and reads each channel's latest upload (about 1–2 s per channel, remembered for 7 days). You can press Stop at any time."),
                 T("3. Kênh không hoạt động = không đăng video quá ngưỡng bạn chọn (mặc định 1 năm). Kênh có Shorts mà video dài đã cũ được ghi \"Có Shorts — chưa rõ\" vì YouTube không cho biết ngày của Shorts; tool không tự chọn các kênh này.",
@@ -133,8 +133,8 @@ internal sealed class GuidePage : UserControl
                   "4. Select channels (or \"Select inactive\") and click Unsubscribe. The tool asks for confirmation and first backs your list up to a CSV file."),
                 T("5. Chuột phải vào kênh để bảo vệ (không bao giờ bị hủy), mở hoặc sao chép link. Muốn đăng ký lại, dùng link trong CSV hoặc tab Lịch sử.",
                   "5. Right-click a channel to protect it (never unsubscribed), open it or copy its link. To subscribe again use the link in the CSV or the History tab."),
-                T("🔑 Đăng xuất YouTube: Cài đặt → YouTube → Đăng xuất (xóa hồ sơ Chrome riêng của tool).",
-                  "🔑 To sign out of YouTube: Settings → YouTube → Sign out (deletes the tool's own Chrome profile)."),
+                T("🔑 Đăng xuất YouTube: tab Tài khoản → YouTube → Đăng xuất / Đổi tài khoản.",
+                  "🔑 To sign out of YouTube: Accounts tab → YouTube → Sign out / Switch account."),
             }));
         flow.Controls.Add(BuildSection("⚙️", T("Cài đặt quan trọng", "Key settings"),
             T("Các tùy chọn ảnh hưởng đến hiệu năng", "Options that affect performance"),

@@ -45,10 +45,6 @@ internal sealed class SettingsPage : UserControl
         BackColor = Theme.Background;
         BuildUi();
         LoadFromSettings();
-        VisibleChanged += (_, _) =>
-        {
-            if (Visible && IsHandleCreated) UpdateSignOutButton();
-        };
     }
 
     private void BuildUi()
@@ -114,7 +110,7 @@ internal sealed class SettingsPage : UserControl
 
         flow.Controls.Add(BuildGroup(T("TẢI VIDEO", "DOWNLOAD"), BuildDownloadRows()));
         flow.Controls.Add(BuildGroup(T("BỎ THEO DÕI", "UNFOLLOW"), BuildUnfollowRows()));
-        flow.Controls.Add(BuildGroup("YOUTUBE", BuildYouTubeRows()));
+        flow.Controls.Add(BuildGroup(T("TRÌNH DUYỆT", "BROWSER"), BuildBrowserRows()));
         flow.Controls.Add(BuildGroup(T("GIAO DIỆN && HỆ THỐNG", "INTERFACE && SYSTEM"), BuildAppRows()));
         flow.Controls.Add(BuildGroup(T("NGÔN NGỮ", "LANGUAGE"), BuildLanguageRows()));
 
@@ -260,127 +256,16 @@ internal sealed class SettingsPage : UserControl
         };
     }
 
-    private Guna2Button _btnSignOutYouTube = null!;
-
-    private List<Control> BuildYouTubeRows()
+    private List<Control> BuildBrowserRows()
     {
-        var signOut = new Guna2Button
-        {
-            Text = T("Đăng xuất", "Sign out"),
-            Font = Theme.FontMedium,
-            Size = new Size(130, 28),
-            FillColor = ColorTranslator.FromHtml("#2a2a2a"),
-            ForeColor = Theme.TextSecondary,
-            BorderRadius = 7,
-            Cursor = Cursors.Hand,
-        };
-        signOut.DisabledState.FillColor = ColorTranslator.FromHtml("#1a1a1a");
-        signOut.DisabledState.ForeColor = Theme.TextMuted;
-        signOut.Click += (_, _) => SignOutYouTube();
-        _btnSignOutYouTube = signOut;
-        UpdateSignOutButton();
-
         _embeddedBrowserToggle = BuildToggle();
 
         return new List<Control>
         {
             BuildRow("🌐", T("Dùng trình duyệt tích hợp (thử nghiệm)", "Use the built-in browser (beta)"),
-                T("Không cần Chrome: đăng nhập ngay trong cửa sổ của app (cần WebView2, có sẵn trên Windows 11). Áp dụng cho lần Kết nối tiếp theo.",
-                  "No Chrome needed: sign in inside an app window (needs WebView2, included with Windows 11). Applies the next time you connect."), _embeddedBrowserToggle),
-            BuildRow("🔑", T("Đăng xuất YouTube", "Sign out of YouTube"),
-                T("Xóa hồ sơ trình duyệt riêng của tool (phiên Google) và bộ nhớ đệm ngày đăng", "Deletes the tool's own browser profile (the Google session) and the upload-date cache"), signOut),
+                T("Không cần Chrome: TikTok và YouTube chạy trong cửa sổ của app (cần WebView2, có sẵn trên Windows 11). Đăng nhập ở tab Tài khoản. Áp dụng cho lần chạy tiếp theo.",
+                  "No Chrome needed: TikTok and YouTube run in an app window (needs WebView2, included with Windows 11). Sign in on the Accounts tab. Applies the next time you run."), _embeddedBrowserToggle),
         };
-    }
-
-    /// <summary>True when the tool's private Chrome profile holds a Google sign-in cookie. The profile folder alone proves nothing: Chrome
-    /// recreates it as soon as the tool opens the sign-in page. When the cookie file cannot be read, assume signed in so the button stays usable.</summary>
-    private static bool HasGoogleSession() =>
-        HasGoogleSessionIn(Path.Combine(AppPaths.YouTubeProfileDir, "Default", "Network", "Cookies"))
-        || HasGoogleSessionIn(Path.Combine(AppPaths.YouTubeWebViewDir, "EBWebView", "Default", "Network", "Cookies"));
-
-    private static bool HasGoogleSessionIn(string cookieFile)
-    {
-        if (!File.Exists(cookieFile))
-        {
-            return false;
-        }
-
-        var copy = Path.Combine(Path.GetTempPath(), $"tiktool_yt_cookies_{Guid.NewGuid():N}.db");
-        try
-        {
-            using (var src = new FileStream(cookieFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
-            using (var dst = new FileStream(copy, FileMode.Create, FileAccess.Write))
-            {
-                src.CopyTo(dst);
-            }
-
-            using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={copy};Pooling=False;Mode=ReadOnly");
-            conn.Open();
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT 1 FROM cookies WHERE host_key LIKE '%google.com' AND name IN ('SAPISID', '__Secure-1PSID', 'SID') LIMIT 1";
-            return cmd.ExecuteScalar() != null;
-        }
-        catch (Exception)
-        {
-            return true;
-        }
-        finally
-        {
-            try { File.Delete(copy); } catch (IOException) { }
-        }
-    }
-
-    private void UpdateSignOutButton()
-    {
-        var signedIn = HasGoogleSession();
-        _btnSignOutYouTube.Enabled = signedIn;
-        _btnSignOutYouTube.Text = signedIn ? T("Đăng xuất", "Sign out") : T("Đã đăng xuất", "Signed out");
-    }
-
-    /// <summary>Forgets the YouTube/Google sign-in: removes the tool's private Chrome profile and the age cache. Backups (CSV) and the
-    /// protected-channel list are kept. Fails politely when the tool's Chrome window is still open (the profile is in use).</summary>
-    private void SignOutYouTube()
-    {
-        var ask = MessageBox.Show(
-            this,
-            T("Đăng xuất YouTube sẽ xóa hồ sơ trình duyệt riêng của tool (phiên đăng nhập Google) và bộ nhớ đệm ngày đăng.\nCác file sao lưu CSV và danh sách kênh được bảo vệ được giữ lại.\n\nTiếp tục?",
-              "Signing out of YouTube deletes the tool's own browser profile (the Google sign-in) and the upload-date cache.\nThe CSV backups and the protected-channel list are kept.\n\nContinue?"),
-            T("Social Toolkit — Đăng xuất YouTube", "Social Toolkit — Sign out of YouTube"),
-            MessageBoxButtons.YesNo,
-            MessageBoxIcon.Question,
-            MessageBoxDefaultButton.Button2);
-        if (ask != DialogResult.Yes)
-        {
-            return;
-        }
-
-        try
-        {
-            if (Directory.Exists(AppPaths.YouTubeProfileDir))
-            {
-                Directory.Delete(AppPaths.YouTubeProfileDir, true);
-            }
-
-            if (Directory.Exists(AppPaths.YouTubeWebViewDir))
-            {
-                Directory.Delete(AppPaths.YouTubeWebViewDir, true);
-            }
-
-            if (File.Exists(AppPaths.YouTubeAgesFile))
-            {
-                File.Delete(AppPaths.YouTubeAgesFile);
-            }
-
-            MessageBox.Show(this, T("Đã đăng xuất YouTube. Lần sau bạn sẽ đăng nhập Google lại.", "Signed out of YouTube. You will sign in to Google again next time."),
-                "Social Toolkit", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            UpdateSignOutButton();
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            MessageBox.Show(this,
-                T("Không xóa được: cửa sổ trình duyệt của tool có thể đang mở. Hãy đóng nó (hoặc thoát app) rồi thử lại.\n\n", "Could not delete it: the tool's browser window may still be open. Close it (or exit the app) and try again.\n\n") + ex.Message,
-                "Social Toolkit", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        }
     }
     private List<Control> BuildAppRows()
     {

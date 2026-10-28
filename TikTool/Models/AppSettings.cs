@@ -25,7 +25,7 @@ public class AppSettings
     public int MaxUnfollowsPerDay { get; set; } = 100;
 
     // Browser: false = the installed Chrome/Edge as a separate window, true = the built-in WebView2 window
-    public bool UseEmbeddedBrowser { get; set; }
+    public bool UseEmbeddedBrowser { get; set; } = true;
 
     // App
     public bool StartWithWindows { get; set; }
