@@ -218,7 +218,7 @@ public sealed class PlaywrightService : IAsyncDisposable
         var chromePath = FindRealChromeExecutable()
             ?? throw new InvalidOperationException(
                 T("Không tìm thấy Google Chrome hoặc Microsoft Edge trên máy. ", "Google Chrome or Microsoft Edge was not found on this computer. ") +
-                T("Hãy cài Chrome/Edge hoặc dùng cách 'Dán cookie thủ công' thay thế.", "Install Chrome/Edge or use the 'Paste cookie manually' method instead."));
+                T("Hãy cài Chrome/Edge hoặc cài WebView2 Runtime.", "Install Chrome/Edge or the WebView2 runtime."));
 
         var port = GetFreeTcpPort();
         var profileDir = Path.Combine(Path.GetTempPath(), $"tiktool_chrome_login_{Guid.NewGuid():N}");

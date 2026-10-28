@@ -16,6 +16,9 @@ internal sealed class UnfollowPage : UserControl
     private readonly HistoryService _historyService;
     private readonly SessionStateService _sessionStateService;
 
+    /// <summary>Asks the shell to open the Accounts tab (set by MainForm) when TikTok is not signed in.</summary>
+    public Action? RequestLogin { get; set; }
+
     private readonly List<FollowingAccount> _accounts = new();
     private readonly Dictionary<FollowingAccount, FollowingItemControl> _rows = new();
 
@@ -151,7 +154,7 @@ internal sealed class UnfollowPage : UserControl
 
         _headerBadge = new Label
         {
-            Text = T("Cần cookie", "Cookie needed"),
+            Text = T("Cần đăng nhập", "Sign-in needed"),
             Font = Theme.FontLabel,
             AutoSize = true,
             Padding = new Padding(8, 4, 8, 4),
@@ -500,8 +503,9 @@ internal sealed class UnfollowPage : UserControl
         var cookie = await _cookieService.LoadCookieAsync();
         if (cookie is null || string.IsNullOrEmpty(cookie.Username))
         {
-            _log.Log(T("[Unfollow] Chưa có cookie đã xác thực — sang tab Cookie để đăng nhập trước.",
-                        "[Unfollow] No authenticated cookie — go to Cookie tab to sign in first."), LogLevel.Warn);
+            _log.Log(T("[Unfollow] Chưa đăng nhập TikTok — mở tab Tài khoản để đăng nhập trước.",
+                        "[Unfollow] Not signed in to TikTok — opening the Accounts tab."), LogLevel.Warn);
+            RequestLogin?.Invoke();
             return;
         }
 
@@ -733,8 +737,8 @@ internal sealed class UnfollowPage : UserControl
                     if (!alive)
                     {
                         throw new InvalidOperationException(T(
-                            "[Unfollow] Cookie hết hạn trong khi đang scan — vào tab Cookie để làm mới rồi thử lại.",
-                            "[Unfollow] Cookie expired during scan — go to Cookie tab to refresh and try again."));
+                            "[Unfollow] Cookie hết hạn trong khi đang scan — vào tab Tài khoản để đăng nhập lại rồi thử lại.",
+                            "[Unfollow] Cookie expired during scan — go to the Accounts tab to sign in again and retry."));
                     }
                 }
             }
@@ -782,7 +786,7 @@ internal sealed class UnfollowPage : UserControl
         var cookie = await _cookieService.LoadCookieAsync();
         if (cookie is null)
         {
-            _log.Log(T("[Unfollow] Không tìm thấy cookie — sang tab Cookie trước.", "[Unfollow] Cookie not found — go to Cookie tab first."), LogLevel.Error);
+            _log.Log(T("[Unfollow] Chưa đăng nhập TikTok — sang tab Tài khoản trước.", "[Unfollow] Not signed in to TikTok — go to the Accounts tab first."), LogLevel.Error);
             return;
         }
 
@@ -1189,7 +1193,7 @@ internal sealed class UnfollowPage : UserControl
         var cookie = await _cookieService.LoadCookieAsync();
         if (cookie is null)
         {
-            _log.Log(T("[Unfollow] Không tìm thấy cookie — sang tab Cookie trước.", "[Unfollow] Cookie not found — go to Cookie tab first."), LogLevel.Error);
+            _log.Log(T("[Unfollow] Chưa đăng nhập TikTok — sang tab Tài khoản trước.", "[Unfollow] Not signed in to TikTok — go to the Accounts tab first."), LogLevel.Error);
             return;
         }
 
@@ -1381,7 +1385,7 @@ internal sealed class UnfollowPage : UserControl
     private void UpdateHeaderBadge()
     {
         var dead = _accounts.Count(a => a.IsDead);
-        _headerBadge.Text = _accounts.Count == 0 ? T("Cần cookie", "Cookie needed") : T($"{dead} không hoạt động / {_accounts.Count}", $"{dead} inactive / {_accounts.Count}");
+        _headerBadge.Text = _accounts.Count == 0 ? T("Cần đăng nhập", "Sign-in needed") : T($"{dead} không hoạt động / {_accounts.Count}", $"{dead} inactive / {_accounts.Count}");
         _headerBadge.ForeColor = dead > 0 ? Theme.Orange : Theme.TextMuted;
     }
 }

@@ -89,28 +89,24 @@ internal sealed class GuidePage : UserControl
                   "⚠️ yt-dlp.exe must be in the Resources folder next to the .exe. Download from github.com/yt-dlp/yt-dlp/releases."),
             }));
 
-        flow.Controls.Add(BuildSection("🍪", T("Tab Cookie — Xác thực tài khoản", "Cookie Tab — Account Auth"),
-            T("Cookie là gì và tại sao cần?", "What is a cookie and why is it needed?"),
+        flow.Controls.Add(BuildSection("🍪", T("Tab Tài khoản — Đăng nhập", "Accounts Tab — Sign in"),
+            T("Vì sao cần đăng nhập?", "Why sign in?"),
             new[]
             {
-                T("Cookie cho phép Social Toolkit truy cập danh sách Following và thực hiện Bỏ theo dõi với quyền tài khoản của bạn.",
-                  "The cookie lets Social Toolkit access your Following list and perform unfollows on your behalf."),
-                T("— Phương thức 1 (Tự động): Social Toolkit đọc cookie thẳng từ Chrome/Edge đang đăng nhập. Nhanh nhất.",
-                  "— Method 1 (Auto): Social Toolkit reads cookies directly from a logged-in Chrome/Edge. Fastest."),
-                T("— Phương thức 2 (Dán thủ công): Mở DevTools (F12) → Network → chọn request bất kỳ → copy header Cookie → dán vào ô.",
-                  "— Method 2 (Manual paste): Open DevTools (F12) → Network → pick any request → copy Cookie header → paste it in."),
-                T("— Phương thức 3 (File): Xuất cookie bằng tiện ích 'Cookie-Editor', lưu file JSON, chọn file đó.",
-                  "— Method 3 (File): Export cookies with the 'Cookie-Editor' extension, save as JSON, select that file."),
-                T("Sau khi lưu cookie, bấm Kiểm tra để xác nhận cookie còn hiệu lực.",
-                  "After saving, click Verify to confirm the cookie is valid."),
+                T("Social Toolkit cần đăng nhập TikTok để đọc danh sách Following và Bỏ theo dõi với quyền tài khoản của bạn.",
+                  "Social Toolkit needs you signed in to TikTok to read your Following list and unfollow on your behalf."),
+                T("— Vào tab Tài khoản và đăng nhập TikTok ngay trong cửa sổ của app (mật khẩu, QR hay SMS đều được). App tự nhận khi bạn đăng nhập xong và nhớ cho các lần sau, không đọc gì từ Chrome của bạn.",
+                  "— Open the Accounts tab and sign in to TikTok right inside the app (password, QR or SMS). The app notices when you are done and remembers it; it reads nothing from your own Chrome."),
+                T("— Muốn dùng tài khoản khác: bấm Đăng xuất / Đổi tài khoản. Tài khoản TikTok của bạn trên Chrome hay điện thoại không bị ảnh hưởng.",
+                  "— To use another account press Sign out / Switch account. Your TikTok account on Chrome or your phone is not affected."),
             }));
 
         flow.Controls.Add(BuildSection("🚫", T("Tab Bỏ Theo Dõi — Dọn kênh không hoạt động", "Unfollow Tab — Inactive channel cleanup"),
             T("'Kênh không hoạt động' là tài khoản không có video, hoặc lâu không đăng (theo ngưỡng bạn chọn)", "'Inactive channel' = an account with no videos, or none posted within the threshold you pick"),
             new[]
             {
-                T("1. Vào tab Cookie, lưu cookie hợp lệ trước.",
-                  "1. Go to the Cookie tab and save a valid cookie first."),
+                T("1. Vào tab Tài khoản và đăng nhập TikTok trước.",
+                  "1. Go to the Accounts tab and sign in to TikTok first."),
                 T("2. Bấm Tải lại để load danh sách Following (lần đầu có thể mất 1–3 phút).",
                   "2. Click Reload to load your Following list (first time may take 1–3 minutes)."),
                 T("3. Social Toolkit tự động kiểm tra số video của từng kênh. Kênh không có video hoặc lâu không đăng được đánh dấu đỏ; bạn bè (theo dõi lẫn nhau) được bỏ qua mặc định.",
@@ -160,8 +156,8 @@ internal sealed class GuidePage : UserControl
             {
                 T("'yt-dlp.exe không tìm thấy': Copy file yt-dlp.exe vào thư mục Resources cạnh TikTool.exe.",
                   "'yt-dlp.exe not found': Copy yt-dlp.exe into the Resources folder next to TikTool.exe."),
-                T("'Cookie không hợp lệ': Cookie hết hạn — vào tab Cookie, xóa cookie cũ và lấy lại.",
-                  "'Invalid cookie': Cookie expired — go to Cookie tab, clear and re-fetch."),
+                T("'Phiên TikTok hết hạn': vào tab Tài khoản, bấm Đăng xuất / Đổi tài khoản rồi đăng nhập lại.",
+                  "'TikTok session expired': go to the Accounts tab, press Sign out / Switch account and sign in again."),
                 T("'Không parse được danh sách Following': Selector TikTok có thể đã đổi. Kiểm tra file Config/selectors.json.",
                   "'Cannot parse Following list': TikTok selectors may have changed. Check Config/selectors.json."),
                 T("'TikTok chặn' (rate limit): Tăng Delay, giảm Session limit, chờ 30–60 phút rồi thử lại.",

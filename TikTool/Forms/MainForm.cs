@@ -49,7 +49,7 @@ public sealed class MainForm : Form
         Font = Theme.FontRegular;
 
         // Tất cả service tạo 1 lần ở đây rồi inject vào các page qua constructor — mỗi page
-        // không tự new() service của mình, để CookiePage/UnfollowPage cùng chia sẻ đúng 1
+        // không tự new() service của mình, để AccountsPage/UnfollowPage cùng chia sẻ đúng 1
         // CookieService, và SettingsPage/HistoryPage thao tác trên cùng dữ liệu mà
         // UnfollowPage/DownloadPage đọc/ghi.
         var settingsService = new SettingsService();
@@ -77,12 +77,14 @@ public sealed class MainForm : Form
         Controls.Add(sidebar);
 
         RegisterPage("download", new DownloadPage(ytDlpService, historyService, settingsService, cookieService));
-        RegisterPage(TikTokUnfollowKey, new UnfollowPage(playwrightService, tikTokApiService, cookieService, settingsService, historyService, sessionStateService));
+        var unfollowPage = new UnfollowPage(playwrightService, tikTokApiService, cookieService, settingsService, historyService, sessionStateService);
+        unfollowPage.RequestLogin = OpenAccounts;
+        RegisterPage(TikTokUnfollowKey, unfollowPage);
         _youTubePage = new YouTubePage(settingsService, historyService);
         RegisterPage(YouTubeUnsubKey, _youTubePage);
-        var cookiePage = new CookiePage(cookieService, playwrightService);
-        cookiePage.CookieStatusChanged += () => _ = RefreshFooterAsync();
-        RegisterPage("cookie", cookiePage);
+        var accountsPage = new AccountsPage(cookieService, playwrightService);
+        accountsPage.CookieStatusChanged += () => _ = RefreshFooterAsync();
+        RegisterPage("accounts", accountsPage);
         RegisterPage("settings", new SettingsPage(settingsService));
         RegisterPage("history", new HistoryPage(historyService));
         RegisterPage("guide", new GuidePage());
@@ -154,6 +156,9 @@ public sealed class MainForm : Form
         Activate();
     }
 
+    /// <summary>Called by a feature page that needs the user to sign in first.</summary>
+    public void OpenAccounts() => NavigateTo("accounts");
+
     private void OpenFromTray(string pageKey)
     {
         RestoreFromTray();
@@ -211,9 +216,9 @@ public sealed class MainForm : Form
         flow.Controls.Add(BuildLogo());
         flow.Controls.Add(BuildSectionLabel(T("CHỨC NĂNG", "FEATURES")));
         flow.Controls.Add(CreateNavItem("download", "📥", "Download"));
+        flow.Controls.Add(CreateNavItem("accounts", "👤", T("Tài khoản", "Accounts")));
         BuildUnfollowGroup(flow);
         flow.Controls.Add(BuildSectionLabel(T("HỆ THỐNG", "SYSTEM")));
-        flow.Controls.Add(CreateNavItem("cookie", "🍪", "Cookie"));
         flow.Controls.Add(CreateNavItem("settings", "🔧", T("Cài đặt", "Settings")));
         flow.Controls.Add(CreateNavItem("history", "📋", T("Lịch sử", "History")));
         flow.Controls.Add(CreateNavItem("guide", "📖", T("Hướng dẫn", "Guide")));
