@@ -145,6 +145,40 @@ public class UpdateApplyTests : IDisposable
     }
 
     [Fact]
+    public void Never_touches_the_install_scripts_or_the_portable_flag()
+    {
+        Put(Staged, "install.bat", "bat");
+        Put(Staged, "uninstall.bat", "bat");
+        Put(Staged, "portable.bat", "bat");
+        Put(Target, "portable.flag", "mine");
+        Put(Staged, "portable.flag", "other");
+        Put(Staged, "TikTool.dll", "new");
+
+        Assert.True(AppUpdater.ApplyFiles(Staged, Target).Ok);
+        Assert.False(File.Exists(Path.Combine(Target, "install.bat")));
+        Assert.False(File.Exists(Path.Combine(Target, "portable.bat")));
+        Assert.Equal("mine", File.ReadAllText(Path.Combine(Target, "portable.flag")));
+        Assert.Equal("new", File.ReadAllText(Path.Combine(Target, "TikTool.dll")));
+    }
+
+    [Fact]
+    public void Data_lives_next_to_the_exe_only_when_the_portable_flag_exists()
+    {
+        var baseDir = Path.Combine(Path.GetTempPath(), "tiktool_paths_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(baseDir);
+        try
+        {
+            Assert.Equal(Path.Combine(@"C:\Roaming", "TikTool"), AppPaths.ResolveDataDir(baseDir, @"C:\Roaming"));
+            File.WriteAllText(Path.Combine(baseDir, "portable.flag"), "x");
+            Assert.Equal(Path.Combine(baseDir, "Data"), AppPaths.ResolveDataDir(baseDir, @"C:\Roaming"));
+        }
+        finally
+        {
+            Directory.Delete(baseDir, true);
+        }
+    }
+
+    [Fact]
     public void Undoes_everything_when_one_file_cannot_be_replaced()
     {
         Put(Target, "a.dll", "old a");

@@ -19,7 +19,7 @@ internal static class AppUpdater
     private const string Repo = "ThanhNguyenVN93/tiktool";
     private const string DownloadPrefix = "https://github.com/" + Repo + "/releases/download/";
 
-    private static readonly string[] NeverReplace = { @"Resources\yt-dlp.exe", @"Resources\ffmpeg.exe" };
+    private static readonly string[] NeverReplace = { @"Resources\yt-dlp.exe", @"Resources\ffmpeg.exe", "install.bat", "portable.bat", "uninstall.bat", "portable.flag" };
     private static readonly HttpClient Http = CreateClient();
 
     private static HttpClient CreateClient()

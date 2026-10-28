@@ -77,6 +77,8 @@ internal sealed class GuidePage : UserControl
             T("Năm bước đầu tiên", "The first five steps"),
             new[]
             {
+                T("0. Cài đặt: trong file zip có install.bat (cài cho riêng bạn vào %LOCALAPPDATA%\\Programs\\SocialToolkit, có shortcut, gỡ bằng uninstall.bat) và portable.bat (chạy tại chỗ, toàn bộ dữ liệu nằm trong thư mục Data cạnh app; xóa file portable.flag để về chế độ thường). Cũng có thể chạy thẳng TikTool.exe.",
+                  "0. Setup: the zip contains install.bat (installs for you only into %LOCALAPPDATA%\\Programs\\SocialToolkit, with shortcuts, removed by uninstall.bat) and portable.bat (runs in place, all data lives in a Data folder next to the app; delete portable.flag to go back to normal mode). You can also just run TikTool.exe."),
                 T("1. Tab Tài khoản: đăng nhập TikTok và/hoặc Google (YouTube) một lần, ngay trong cửa sổ của app. Chỉ cần đăng nhập nền tảng bạn định dùng.",
                   "1. Accounts tab: sign in to TikTok and/or Google (YouTube) once, right inside the app. You only need the platform you want to use."),
                 T("2. Dọn TikTok: Bỏ theo dõi → TikTok Unfollow, bấm Tải lại, chọn các kênh không hoạt động, bấm Bắt đầu.",

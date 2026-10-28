@@ -13,7 +13,11 @@ The display name is **Social Toolkit**; the executable and the data folder are s
 ## 1. Install
 
 1. Open the **[Releases](https://github.com/ThanhNguyenVN93/tiktool/releases)** page and download `SocialToolkit-…-win-x64.zip`.
-2. Unzip it anywhere (for example `D:\SocialToolkit`) and run **`TikTool.exe`**. No installer, no .NET to install, no Chrome needed.
+2. **Right-click the zip → Properties → tick *Unblock* → OK** (if shown), then unzip it anywhere (for example `D:\SocialToolkit`). It contains two ready-made launchers, pick one:
+   - **`install.bat`**: installs for you only into `%LOCALAPPDATA%\Programs\SocialToolkit` (no administrator rights, no registry entries), creates a Start Menu shortcut and, if you want, a Desktop one. Remove it with `uninstall.bat` in the install folder (it asks whether to delete your data; the default is no).
+   - **`portable.bat`**: runs right where it is and can travel (USB stick...). **All data** (accounts, history, settings, logs, downloads) lives in a `Data` folder next to the program; delete the folder and nothing is left. To go back to normal mode, delete the file `portable.flag`. Note: the TikTok sign-in is encrypted for your Windows account, so on another PC you sign in again.
+   - Or use neither and run **`TikTool.exe`** directly (data then lives in `%APPDATA%\TikTool`).
+   No .NET to install, no Chrome needed. The `.bat` files are plain text: open them in Notepad to see everything they do.
 3. Requirements: **Windows 10/11 64-bit** and the **WebView2 Runtime** (included with Windows 11; usually present on Windows 10). If the app says it is missing, get the "Evergreen Bootstrapper" from <https://developer.microsoft.com/microsoft-edge/webview2/>.
 4. **Windows SmartScreen / antivirus may warn** because the app is not code-signed (a code-signing certificate is a paid item). Press *More info → Run anyway*. You can compare the SHA256 of the zip with the one on the Release page to be sure the file is untouched.
 

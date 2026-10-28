@@ -10,7 +10,7 @@
     <AssemblyName>TikTool</AssemblyName>
     <Product>Social Toolkit</Product>
     <AssemblyTitle>Social Toolkit</AssemblyTitle>
-    <Version>1.0.0-beta.3</Version>
+    <Version>1.0.0-beta.4</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
     <Company>ThanhNguyenVN93</Company>
@@ -52,6 +52,11 @@
          without this, YtDlpService.ResolveExecutable's "Resources\yt-dlp.exe next to the built
          exe" check silently never finds them, since AppContext.BaseDirectory is the build output
          folder, not this source folder. -->
+    <!-- install.bat / portable.bat / uninstall.bat are only added to the release (publish) folder, not to dev builds. -->
+    <None Include="Packaging\*.bat">
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <Link>%(Filename)%(Extension)</Link>
+    </None>
     <None Include="Resources\**" Condition="Exists('Resources')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <Link>Resources\%(RecursiveDir)%(Filename)%(Extension)</Link>
