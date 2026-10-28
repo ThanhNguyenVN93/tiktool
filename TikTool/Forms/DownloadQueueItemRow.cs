@@ -79,7 +79,7 @@ public sealed class DownloadQueueItemRow : Guna2Panel
 
         _statusBadge = new Label
         {
-            Text = "Chờ",
+            Text = T("Chờ", "Waiting"),
             Font = Theme.FontLabel,
             ForeColor = Theme.TextMuted,
             AutoSize = false,
@@ -105,7 +105,7 @@ public sealed class DownloadQueueItemRow : Guna2Panel
         {
             case DownloadStatus.Waiting:
                 _progressBar.Visible = false;
-                _statusBadge.Text = "Chờ";
+                _statusBadge.Text = T("Chờ", "Waiting");
                 _statusBadge.ForeColor = Theme.TextMuted;
                 break;
             case DownloadStatus.Downloading:
@@ -116,12 +116,12 @@ public sealed class DownloadQueueItemRow : Guna2Panel
                 break;
             case DownloadStatus.Done:
                 _progressBar.Visible = false;
-                _statusBadge.Text = "✓ Xong";
+                _statusBadge.Text = T("✓ Xong", "✓ Done");
                 _statusBadge.ForeColor = Theme.Green;
                 break;
             case DownloadStatus.Error:
                 _progressBar.Visible = false;
-                _statusBadge.Text = "✗ Lỗi";
+                _statusBadge.Text = T("✗ Lỗi", "✗ Error");
                 _statusBadge.ForeColor = ColorTranslator.FromHtml("#f87171");
                 break;
         }

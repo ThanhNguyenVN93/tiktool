@@ -18,6 +18,11 @@
     <ApplicationIcon>Resources\tiktool.ico</ApplicationIcon>
   </PropertyGroup>
 
+  <!-- Playwright auto-installs ~150MB bundled Chromium after every build.
+       This app always attaches to the user's real Chrome/Edge via CDP — bundled browsers
+       are never needed. Override the target with an empty one to skip the download. -->
+  <Target Name="PlaywrightInstall" />
+
   <ItemGroup>
     <PackageReference Include="Guna.UI2.WinForms" Version="2.0.4.6" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.10" />

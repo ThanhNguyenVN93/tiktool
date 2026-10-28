@@ -40,8 +40,8 @@ internal sealed class GuidePage : UserControl
         });
         header.Controls.Add(new Label
         {
-            Text = T("Cách dùng TikTool từ A–Z, câu hỏi thường gặp và cách khắc phục lỗi",
-                     "How to use TikTool A–Z, FAQ and troubleshooting"),
+            Text = T("Cách dùng Social Toolkit từ A–Z, câu hỏi thường gặp và cách khắc phục lỗi",
+                     "How to use Social Toolkit A–Z, FAQ and troubleshooting"),
             Font = new Font("Segoe UI", 8.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = true,
@@ -93,10 +93,10 @@ internal sealed class GuidePage : UserControl
             T("Cookie là gì và tại sao cần?", "What is a cookie and why is it needed?"),
             new[]
             {
-                T("Cookie cho phép TikTool truy cập danh sách Following và thực hiện Bỏ theo dõi với quyền tài khoản của bạn.",
-                  "The cookie lets TikTool access your Following list and perform unfollows on your behalf."),
-                T("— Phương thức 1 (Tự động): TikTool đọc cookie thẳng từ Chrome/Edge đang đăng nhập. Nhanh nhất.",
-                  "— Method 1 (Auto): TikTool reads cookies directly from a logged-in Chrome/Edge. Fastest."),
+                T("Cookie cho phép Social Toolkit truy cập danh sách Following và thực hiện Bỏ theo dõi với quyền tài khoản của bạn.",
+                  "The cookie lets Social Toolkit access your Following list and perform unfollows on your behalf."),
+                T("— Phương thức 1 (Tự động): Social Toolkit đọc cookie thẳng từ Chrome/Edge đang đăng nhập. Nhanh nhất.",
+                  "— Method 1 (Auto): Social Toolkit reads cookies directly from a logged-in Chrome/Edge. Fastest."),
                 T("— Phương thức 2 (Dán thủ công): Mở DevTools (F12) → Network → chọn request bất kỳ → copy header Cookie → dán vào ô.",
                   "— Method 2 (Manual paste): Open DevTools (F12) → Network → pick any request → copy Cookie header → paste it in."),
                 T("— Phương thức 3 (File): Xuất cookie bằng tiện ích 'Cookie-Editor', lưu file JSON, chọn file đó.",
@@ -105,22 +105,22 @@ internal sealed class GuidePage : UserControl
                   "After saving, click Verify to confirm the cookie is valid."),
             }));
 
-        flow.Controls.Add(BuildSection("🚫", T("Tab Bỏ Theo Dõi — Unfollow kênh chết", "Unfollow Tab — Dead channel cleanup"),
-            T("'Kênh chết' là tài khoản có 0 video", "'Dead channel' = account with 0 videos"),
+        flow.Controls.Add(BuildSection("🚫", T("Tab Bỏ Theo Dõi — Dọn kênh không hoạt động", "Unfollow Tab — Inactive channel cleanup"),
+            T("'Kênh không hoạt động' là tài khoản không có video, hoặc lâu không đăng (theo ngưỡng bạn chọn)", "'Inactive channel' = an account with no videos, or none posted within the threshold you pick"),
             new[]
             {
                 T("1. Vào tab Cookie, lưu cookie hợp lệ trước.",
                   "1. Go to the Cookie tab and save a valid cookie first."),
                 T("2. Bấm Tải lại để load danh sách Following (lần đầu có thể mất 1–3 phút).",
                   "2. Click Reload to load your Following list (first time may take 1–3 minutes)."),
-                T("3. TikTool tự động kiểm tra số video của từng kênh. Kênh có 0 video được đánh dấu đỏ.",
-                  "3. TikTool checks each channel's video count. Channels with 0 videos are marked red."),
-                T("4. Chọn các kênh muốn bỏ theo dõi (hoặc Chọn tất cả kênh chết), rồi bấm Bắt đầu.",
-                  "4. Select channels to unfollow (or Select all dead channels), then click Start."),
+                T("3. Social Toolkit tự động kiểm tra số video của từng kênh. Kênh không có video hoặc lâu không đăng được đánh dấu đỏ; bạn bè (theo dõi lẫn nhau) được bỏ qua mặc định.",
+                  "3. Social Toolkit checks each channel's video count. Channels with no videos or no recent posts are marked red; mutual friends are skipped by default."),
+                T("4. Chọn các kênh muốn bỏ theo dõi (hoặc Chọn không hoạt động / Chọn tất cả đang hiện), rồi bấm Bắt đầu.",
+                  "4. Select channels to unfollow (or Select inactive / Select all shown), then click Start."),
                 T("5. Giới hạn mỗi phiên: mặc định 50 kênh/lần để tránh bị TikTok khoá tài khoản.",
                   "5. Session limit: default 50 per run to avoid TikTok account restrictions."),
-                T("⚠️ Lần đầu dùng tab này, Chromium (~300 MB) sẽ tự tải về. Quá trình này mất vài phút.",
-                  "⚠️ First use of this tab downloads Chromium (~300 MB). This takes a few minutes."),
+                T("⚠️ Cần cài sẵn Google Chrome (hoặc Edge) trên máy; Social Toolkit điều khiển chính trình duyệt đó, không tải thêm gì.",
+                  "⚠️ Google Chrome (or Edge) must be installed; Social Toolkit drives that browser and downloads nothing extra."),
             }));
 
         flow.Controls.Add(BuildSection("⚙️", T("Cài đặt quan trọng", "Key settings"),

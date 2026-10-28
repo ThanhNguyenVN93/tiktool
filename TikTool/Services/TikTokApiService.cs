@@ -29,5 +29,5 @@ public sealed class TikTokApiService
 {
     public Task UnfollowAsync(string userId, TikTokCookie cookie, CancellationToken ct = default) =>
         throw new NotSupportedException(
-            "Unfollow qua API trực tiếp không dùng được — TikTok âm thầm bỏ qua request không có chữ ký hợp lệ (trả về thành công giả). Dùng trình duyệt thật thay thế.");
+            T("Unfollow qua API trực tiếp không dùng được — TikTok âm thầm bỏ qua request không có chữ ký hợp lệ (trả về thành công giả). Dùng trình duyệt thật thay thế.", "Unfollowing through the API directly does not work — TikTok silently ignores requests without a valid signature (and reports a fake success). Use the real browser instead."));
 }

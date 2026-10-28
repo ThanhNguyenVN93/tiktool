@@ -19,6 +19,13 @@ public sealed class MainForm : Form
     private readonly PlaywrightService _playwrightServiceRef;
     private NotifyIcon? _trayIcon;
 
+    // "Unfollow" is a collapsible group: clicking the parent only opens/closes it, the pages are the children.
+    private Guna2Button _unfollowParent = null!;
+    private FlowLayoutPanel _unfollowChildren = null!;
+    private bool _unfollowExpanded;
+    private const string TikTokUnfollowKey = "unfollow";
+    private const string YouTubeUnsubKey = "youtube-unsub";
+
     // Footer status row refs — updated async after Load
     private Label _lblYtDlp = null!;
     private Guna2Panel _dotYtDlp = null!;
@@ -29,7 +36,7 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "TikTool";
+        Text = "Social Toolkit";
         StartPosition = FormStartPosition.CenterScreen;
         Size = new Size(1080, 700);
         MinimumSize = new Size(900, 600);
@@ -50,6 +57,7 @@ public sealed class MainForm : Form
         _playwrightServiceRef = playwrightService;
         var tikTokApiService = new TikTokApiService();
         var historyService = new HistoryService();
+        var sessionStateService = new SessionStateService();
         _updateService = new UpdateService(ytDlpService);
 
         var sidebar = BuildSidebar();
@@ -64,7 +72,8 @@ public sealed class MainForm : Form
         Controls.Add(sidebar);
 
         RegisterPage("download", new DownloadPage(ytDlpService, historyService, settingsService, cookieService));
-        RegisterPage("unfollow", new UnfollowPage(playwrightService, tikTokApiService, cookieService, settingsService, historyService));
+        RegisterPage(TikTokUnfollowKey, new UnfollowPage(playwrightService, tikTokApiService, cookieService, settingsService, historyService, sessionStateService));
+        RegisterPage(YouTubeUnsubKey, new YouTubeProbePage());
         var cookiePage = new CookiePage(cookieService, playwrightService);
         cookiePage.CookieStatusChanged += () => _ = RefreshFooterAsync();
         RegisterPage("cookie", cookiePage);
@@ -99,14 +108,14 @@ public sealed class MainForm : Form
     private void InitTrayIcon()
     {
         var menu = new ContextMenuStrip();
-        menu.Items.Add("Mở TikTool", null, (_, _) => RestoreFromTray());
+        menu.Items.Add(T("Mở Social Toolkit", "Open Social Toolkit"), null, (_, _) => RestoreFromTray());
         menu.Items.Add(new ToolStripSeparator());
-        menu.Items.Add("Thoát", null, (_, _) => { _trayIcon!.Visible = false; Application.Exit(); });
+        menu.Items.Add(T("Thoát", "Exit"), null, (_, _) => { _trayIcon!.Visible = false; Application.Exit(); });
 
         _trayIcon = new NotifyIcon
         {
             Icon = SystemIcons.Application,
-            Text = "TikTool",
+            Text = "Social Toolkit",
             ContextMenuStrip = menu,
         };
         _trayIcon.DoubleClick += (_, _) => RestoreFromTray();
@@ -127,7 +136,7 @@ public sealed class MainForm : Form
             e.Cancel = true;
             Hide();
             _trayIcon!.Visible = true;
-            _trayIcon.ShowBalloonTip(2000, "TikTool", "Ứng dụng vẫn đang chạy trong khay hệ thống.", ToolTipIcon.Info);
+            _trayIcon.ShowBalloonTip(2000, "Social Toolkit", T("Ứng dụng vẫn đang chạy trong khay hệ thống.", "The app is still running in the system tray."), ToolTipIcon.Info);
             return;
         }
 
@@ -159,7 +168,7 @@ public sealed class MainForm : Form
         flow.Controls.Add(BuildLogo());
         flow.Controls.Add(BuildSectionLabel(T("CHỨC NĂNG", "FEATURES")));
         flow.Controls.Add(CreateNavItem("download", "📥", "Download"));
-        flow.Controls.Add(CreateNavItem("unfollow", "🚫", T("Bỏ theo dõi", "Unfollow")));
+        BuildUnfollowGroup(flow);
         flow.Controls.Add(BuildSectionLabel(T("HỆ THỐNG", "SYSTEM")));
         flow.Controls.Add(CreateNavItem("cookie", "🍪", "Cookie"));
         flow.Controls.Add(CreateNavItem("settings", "🔧", T("Cài đặt", "Settings")));
@@ -173,6 +182,57 @@ public sealed class MainForm : Form
         sidebar.Controls.Add(BuildFooter());
 
         return sidebar;
+    }
+
+    private void BuildUnfollowGroup(FlowLayoutPanel flow)
+    {
+        _unfollowParent = new Guna2Button
+        {
+            TextAlign = HorizontalAlignment.Left,
+            Height = 36,
+            Width = 164,
+            Margin = new Padding(8, 2, 8, 2),
+            Font = Theme.FontMedium,
+            BorderRadius = 6,
+            Cursor = Cursors.Hand,
+            Animated = true,
+            FillColor = Theme.Sidebar,
+            ForeColor = Theme.TextMuted,
+        };
+        _unfollowParent.HoverState.FillColor = ColorTranslator.FromHtml("#161616");
+        _unfollowParent.HoverState.ForeColor = ColorTranslator.FromHtml("#cccccc");
+        _unfollowParent.Click += (_, _) => SetUnfollowExpanded(!_unfollowExpanded);
+
+        _unfollowChildren = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            BackColor = Theme.Sidebar,
+            Margin = new Padding(0),
+        };
+
+        foreach (var (key, label) in new[] { (TikTokUnfollowKey, "TikTok Unfollow"), (YouTubeUnsubKey, "YouTube Unsubscribe") })
+        {
+            var item = CreateNavItem(key, "", label);
+            item.Text = $"  {label}";
+            item.Width = 158;
+            item.Margin = new Padding(14, 2, 8, 2);
+            item.Font = new Font("Segoe UI", 8.5f, FontStyle.Bold);
+            _unfollowChildren.Controls.Add(item);
+        }
+
+        flow.Controls.Add(_unfollowParent);
+        flow.Controls.Add(_unfollowChildren);
+        SetUnfollowExpanded(false);
+    }
+
+    private void SetUnfollowExpanded(bool expanded)
+    {
+        _unfollowExpanded = expanded;
+        _unfollowChildren.Visible = expanded;
+        _unfollowParent.Text = $"  🚫   {T("Bỏ theo dõi", "Unfollow")}   {(expanded ? "▾" : "▸")}";
     }
 
     private static Control BuildLogo()
@@ -198,7 +258,7 @@ public sealed class MainForm : Form
 
         var title = new Label
         {
-            Text = "TikTool",
+            Text = "Social Toolkit",
             Font = Theme.FontTitle,
             ForeColor = Color.White,
             AutoSize = true,
@@ -206,7 +266,7 @@ public sealed class MainForm : Form
         };
         var sub = new Label
         {
-            Text = "2-in-1 Desktop",
+            Text = "Download & clean up",
             Font = new Font("Segoe UI", 7.5f),
             ForeColor = Theme.TextMuted,
             AutoSize = true,
@@ -357,7 +417,7 @@ public sealed class MainForm : Form
         }
         catch
         {
-            SetFooterRow(_lblYtDlp, _dotYtDlp, "yt-dlp chưa cài", Theme.Orange);
+            SetFooterRow(_lblYtDlp, _dotYtDlp, T("yt-dlp chưa cài", "yt-dlp not installed"), Theme.Orange);
         }
 
         // Chrome
@@ -391,7 +451,7 @@ public sealed class MainForm : Form
         }
         catch
         {
-            SetFooterRow(_lblCookie, _dotCookie, "Cookie chưa xác thực", Theme.TextMuted);
+            SetFooterRow(_lblCookie, _dotCookie, T("Cookie chưa xác thực", "Cookie not verified"), Theme.TextMuted);
         }
     }
 
@@ -433,5 +493,13 @@ public sealed class MainForm : Form
         {
             nav.Active = nav.PageKey == key;
         }
+
+        var inUnfollowGroup = key is TikTokUnfollowKey or YouTubeUnsubKey;
+        if (inUnfollowGroup)
+        {
+            SetUnfollowExpanded(true);
+        }
+
+        _unfollowParent.ForeColor = inUnfollowGroup ? Theme.Accent : Theme.TextMuted;
     }
 }

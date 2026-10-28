@@ -573,16 +573,16 @@ internal sealed class CookiePage : UserControl
 
             return cookie;
         }
-        catch (InvalidOperationException ex) when (allowKillRetry && ex.Message.Contains("đang khóa file cookie"))
+        catch (CookieFileLockedException ex) when (allowKillRetry)
         {
             _log.Log($"[Cookie] {ex.Message}", LogLevel.Warn);
 
             var choice = MessageBox.Show(
-                T($"{name} đang mở nên khóa file cookie.\n\nCho phép TikTool tự đóng {name} để đọc cookie? " +
+                T($"{name} đang mở nên khóa file cookie.\n\nCho phép Social Toolkit tự đóng {name} để đọc cookie? " +
                   $"Tất cả tab đang mở trong {name} sẽ bị đóng ngay lập tức (không lưu).",
-                  $"{name} is open and has the cookie file locked.\n\nAllow TikTool to close {name} to read the cookie? " +
+                  $"{name} is open and has the cookie file locked.\n\nAllow Social Toolkit to close {name} to read the cookie? " +
                   $"All open tabs in {name} will be closed immediately (unsaved)."),
-                T("TikTool — Đóng trình duyệt?", "TikTool — Close browser?"),
+                T("Social Toolkit — Đóng trình duyệt?", "Social Toolkit — Close browser?"),
                 MessageBoxButtons.YesNo,
                 MessageBoxIcon.Warning);
 
@@ -668,7 +668,7 @@ internal sealed class CookiePage : UserControl
         }
         catch (Exception ex)
         {
-            _log.Log($"[Login] Lỗi: {ex.Message}", LogLevel.Error);
+            _log.Log(T($"[Login] Lỗi: {ex.Message}", $"[Login] Error: {ex.Message}"), LogLevel.Error);
         }
         finally
         {
