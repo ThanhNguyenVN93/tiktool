@@ -17,6 +17,15 @@ The display name is **Social Toolkit**; the executable and the data folder are s
 3. Requirements: **Windows 10/11 64-bit** and the **WebView2 Runtime** (included with Windows 11; usually present on Windows 10). If the app says it is missing, get the "Evergreen Bootstrapper" from <https://developer.microsoft.com/microsoft-edge/webview2/>.
 4. **Windows SmartScreen / antivirus may warn** because the app is not code-signed (a code-signing certificate is a paid item). Press *More info → Run anyway*. You can compare the SHA256 of the zip with the one on the Release page to be sure the file is untouched.
 
+## 1b. Updating
+
+- When the app starts and GitHub has a newer release, a bar at the top of the window says **"A new version vX is available"** with **Update now**, **What's new** (opens the Release page) and **Later**. The app sends **one request** to GitHub and none of your data.
+- **Update now**: the app downloads the zip, **checks its SHA256** against the `.sha256` file of the release (a mismatch discards the file, nothing is installed), unpacks it safely, asks you to confirm, swaps the changed files and **restarts by itself**. If any step fails **everything is rolled back** and the app stays as it was.
+- **Install automatically** (on by default, can be turned off in *Settings → Updates*): the new version is downloaded in the background and **installed the next time you start the app**.
+- Your data in `%APPDATA%\TikTool\` is never touched. `Resources\yt-dlp.exe` and `ffmpeg.exe` are never replaced (you or yt-dlp itself own them).
+- A stable install is never moved to a pre-release. To update by hand: download the new zip from the Release page and unzip it over the old folder.
+- If an update fails or cannot be installed, look at `logs\update.log`.
+
 ## 2. Quick start
 
 1. Open the **Accounts** tab, pick **TikTok** or **YouTube** and sign in right inside the frame (password, QR or SMS). The app notices when you are done. You only need to sign in to the platform you want to use.
@@ -61,6 +70,7 @@ Paste links (several, one per line), pick MP4 / MP3 / MKV, choose the folder and
 | Start with Windows / minimize to tray | Optional; the tray menu has shortcuts to the tabs |
 | Language | English (default) or Vietnamese (the app restarts by itself) |
 | Logs → Open folder | Opens the log folder |
+| Updates | Check for updates when the app starts (on), install automatically (on), a *Check now* button |
 
 ## 8. Where data is kept, privacy
 
@@ -74,6 +84,7 @@ Everything stays on your computer, in `%APPDATA%\TikTool\`. The app **does not s
 | `youtube_backups\*.csv` | Subscription backups made before each unsubscribe |
 | `settings.dat`, `session_resume.dat`, `lastpost.dat`, `youtube_ages.dat`, `avatars\` | Settings, unfinished session, caches |
 | `logs\`, `debug\` | Logs and screenshots taken when a captcha shows |
+| `update\` | A downloaded update waiting to be installed (removed after the install) |
 
 **The app does not read or decrypt your own Chrome/Edge data.** To wipe everything: sign out on the Accounts tab, then delete `%APPDATA%\TikTool\` while the app is closed.
 
