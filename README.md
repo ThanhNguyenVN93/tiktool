@@ -17,6 +17,15 @@ Tên hiển thị là **Social Toolkit**; tên file chạy và thư mục dữ l
 3. Yêu cầu: **Windows 10/11 64-bit** và **WebView2 Runtime** (Windows 11 có sẵn; Windows 10 thường đã có). Nếu app báo thiếu, tải "Evergreen Bootstrapper" tại <https://developer.microsoft.com/microsoft-edge/webview2/>.
 4. **Windows SmartScreen / antivirus có thể cảnh báo** vì app chưa được ký số (chữ ký số là loại chứng chỉ trả phí). Bấm *Thông tin thêm → Vẫn chạy*. Bạn có thể so mã SHA256 của file zip với mã ghi trên trang Release để chắc file không bị sửa.
 
+## 1b. Cập nhật phiên bản
+
+- Khi mở app, nếu có bản mới trên GitHub, đầu cửa sổ hiện một dải **"Có bản mới vX"** với các nút **Cập nhật ngay**, **Có gì mới** (mở trang Release) và **Để sau**. App chỉ gửi **một yêu cầu** tới GitHub, không gửi dữ liệu của bạn.
+- **Cập nhật ngay**: app tải file zip, **kiểm tra SHA256** với file `.sha256` của bản phát hành (sai là bỏ file, không cài), giải nén an toàn, hỏi xác nhận, thay các file đã đổi rồi **tự khởi động lại**. Nếu một bước lỗi thì **hoàn tác hết**, app vẫn như cũ.
+- **Tự cài** (mặc định bật, tắt được ở *Cài đặt → Cập nhật*): bản mới được tải ở nền và **cài vào lần mở app kế tiếp**.
+- Dữ liệu của bạn trong `%APPDATA%\TikTool\` không bị đụng tới. `Resources\yt-dlp.exe` và `ffmpeg.exe` không bao giờ bị thay (do bạn hoặc chính yt-dlp cập nhật).
+- Bản cài thường (không phải bản thử nghiệm) sẽ không bao giờ bị chuyển sang bản thử nghiệm. Muốn tự tay: tải zip mới ở trang Release và giải nén đè lên thư mục cũ.
+- Lỗi cập nhật hoặc cài không được: xem `logs\update.log`.
+
 ## 2. Bắt đầu nhanh
 
 1. Mở tab **Tài khoản**, chọn **TikTok** hoặc **YouTube**, đăng nhập ngay trong khung (mật khẩu, QR hay SMS đều được). App tự nhận khi bạn đăng nhập xong. Chỉ cần đăng nhập nền tảng bạn định dùng.
@@ -61,6 +70,7 @@ Dán link (nhiều link, mỗi dòng một cái), chọn MP4 / MP3 / MKV, chọn
 | Khởi động cùng Windows / thu nhỏ xuống khay | Tùy chọn; menu khay có đường tắt tới các tab |
 | Ngôn ngữ | English (mặc định) hoặc Tiếng Việt (app tự khởi động lại) |
 | Nhật ký → Mở thư mục | Mở thư mục log |
+| Cập nhật | Kiểm tra bản mới khi mở app (bật), tự cài bản mới (bật), nút *Kiểm tra ngay* |
 
 ## 8. Dữ liệu lưu ở đâu, quyền riêng tư
 
@@ -74,6 +84,7 @@ Mọi thứ nằm trên máy bạn, trong `%APPDATA%\TikTool\`. App **không g�
 | `youtube_backups\*.csv` | Bản sao lưu danh sách đăng ký trước mỗi lần hủy |
 | `settings.dat`, `session_resume.dat`, `lastpost.dat`, `youtube_ages.dat`, `avatars\` | Cài đặt, phiên dang dở, bộ nhớ đệm |
 | `logs\`, `debug\` | Nhật ký và ảnh chụp khi gặp captcha |
+| `update\` | Bản cập nhật đã tải và đang chờ cài (tự xóa sau khi cài) |
 
 **App không đọc, không giải mã dữ liệu của Chrome/Edge của bạn.** Muốn xóa sạch: đăng xuất ở tab Tài khoản rồi xóa thư mục `%APPDATA%\TikTool\` khi app đã đóng.
 

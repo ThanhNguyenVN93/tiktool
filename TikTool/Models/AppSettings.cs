@@ -29,6 +29,10 @@ public class AppSettings
     // The built-in browser's work window starts hidden (the page has a button to show it; it also appears by itself when a captcha needs the user)
     public bool RunBrowserHidden { get; set; }
 
+    // Updates: look for a newer release when the app starts; download it in the background and install it the next time the app starts
+    public bool CheckForUpdates { get; set; } = true;
+    public bool AutoInstallUpdates { get; set; } = true;
+
     // App
     public bool StartWithWindows { get; set; }
     public bool MinimizeToTray { get; set; }
